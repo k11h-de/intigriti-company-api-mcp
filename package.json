@@ -1,0 +1,39 @@
+{
+  "name": "intigriti-company-api-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for the Intigriti Company API v2.1",
+  "license": "MIT",
+  "private": false,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "dist/index.js",
+  "bin": {
+    "intigriti-company-api-mcp": "dist/index.js",
+    "intigriti-mcp-login": "dist/cli/login.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "generate-types": "tsx scripts/generate-types.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "openapi-typescript": "^7.13.0",
+    "tsx": "^4.22.3",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.7"
+  }
+}
