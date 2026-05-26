@@ -66,6 +66,7 @@ All configuration is via environment variables.
 | `INTIGRITI_CLIENT_ID` | OAuth client ID | unset | login helper |
 | `INTIGRITI_CLIENT_SECRET` | OAuth client secret (confidential clients only) | unset | login helper |
 | `INTIGRITI_LOGIN_PORT` | Local callback server port for the OAuth redirect | `8765` | login helper |
+| `INTIGRITI_LOGIN_SCOPES` | Space-separated scope list to request; override the default when your integration grants a narrower set (e.g. omit `offline_access` for non-expiring tokens, or `reward_system:*` if not enabled) | full default scope set | login helper |
 | `INTIGRITI_CREDENTIALS_PATH` | Override the credentials file location | `~/.intigriti-mcp/credentials.json` | both |
 
 ## Claude Desktop configuration

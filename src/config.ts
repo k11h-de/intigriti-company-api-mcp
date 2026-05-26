@@ -8,6 +8,7 @@ export interface Config {
   loginPort: number;
   clientId: string | undefined;
   clientSecret: string | undefined;
+  loginScopes: string | undefined;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -35,5 +36,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const clientId = env["INTIGRITI_CLIENT_ID"] || undefined;
   const clientSecret = env["INTIGRITI_CLIENT_SECRET"] || undefined;
 
-  return { baseUrl, envAccessToken, credentialsPath, loginPort, clientId, clientSecret };
+  const rawScopes = env["INTIGRITI_LOGIN_SCOPES"];
+  const loginScopes = rawScopes && rawScopes.trim().length > 0 ? rawScopes.trim() : undefined;
+
+  return { baseUrl, envAccessToken, credentialsPath, loginPort, clientId, clientSecret, loginScopes };
 }

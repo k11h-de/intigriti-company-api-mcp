@@ -8,7 +8,7 @@ import { awaitCallback } from "./callback-server.js";
 async function main(): Promise<void> {
   try {
     const config = loadConfig();
-    const { clientId, clientSecret, loginPort, credentialsPath } = config;
+    const { clientId, clientSecret, loginPort, credentialsPath, loginScopes } = config;
 
     if (!clientId) {
       process.stderr.write(
@@ -22,7 +22,13 @@ async function main(): Promise<void> {
     const state = randomBytes(16).toString("base64url");
     const redirectUri = `http://localhost:${loginPort}/callback`;
 
-    const authorizeUrl = buildAuthorizeUrl({ clientId, redirectUri, state, codeChallenge });
+    const authorizeUrl = buildAuthorizeUrl({
+      clientId,
+      redirectUri,
+      state,
+      codeChallenge,
+      scope: loginScopes,
+    });
 
     let code: string;
     try {

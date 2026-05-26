@@ -15,6 +15,7 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
     loginPort: 8765,
     clientId: undefined,
     clientSecret: undefined,
+    loginScopes: undefined,
     ...overrides,
   };
 }
