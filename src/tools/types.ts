@@ -9,7 +9,16 @@ export interface ToolDef<I = unknown> {
     readOnlyHint: boolean;
     destructiveHint: boolean;
     idempotentHint: boolean;
-    openWorldHint: true;
+    openWorldHint: boolean;
   };
   handler: (input: I, client: IntigritiClient) => Promise<unknown>;
 }
+
+export type AnyToolDef = ToolDef<any>;
+
+export const READ_ONLY_ANNOTATIONS = {
+  readOnlyHint: true,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: true,
+} as const satisfies ToolDef<never>["annotations"];

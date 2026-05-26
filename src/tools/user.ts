@@ -1,4 +1,5 @@
-import type { ToolDef } from "./types.js";
+import type { ToolDef, AnyToolDef } from "./types.js";
+import { READ_ONLY_ANNOTATIONS } from "./types.js";
 import {
   UserIpLookupInputSchema,
   UserResearcherAccessInputSchema,
@@ -6,19 +7,12 @@ import {
   type UserResearcherAccessInput,
 } from "../schemas/user.js";
 
-const READ_ONLY = {
-  readOnlyHint: true,
-  destructiveHint: false,
-  idempotentHint: true,
-  openWorldHint: true,
-} as const;
-
 const userIpLookup: ToolDef<UserIpLookupInput> = {
   name: "intigriti_user_iplookup",
   description:
     "Look up an IP address in Intigriti's user database to determine if it belongs to a registered Intigriti researcher. Useful for triage when an IP appears in a submission.",
   inputSchema: UserIpLookupInputSchema,
-  annotations: READ_ONLY,
+  annotations: READ_ONLY_ANNOTATIONS,
   handler: (input, client) =>
     client.request({
       method: "GET",
@@ -32,7 +26,7 @@ const userResearcherAccess: ToolDef<UserResearcherAccessInput> = {
   description:
     "Check whether a specific researcher has access to a program. Returns the researcher's access status for the given program.",
   inputSchema: UserResearcherAccessInputSchema,
-  annotations: READ_ONLY,
+  annotations: READ_ONLY_ANNOTATIONS,
   handler: (input, client) =>
     client.request({
       method: "GET",
@@ -44,7 +38,7 @@ const userResearcherAccess: ToolDef<UserResearcherAccessInput> = {
     }),
 };
 
-export const userTools: ToolDef[] = [
-  userIpLookup as ToolDef,
-  userResearcherAccess as ToolDef,
+export const userTools: AnyToolDef[] = [
+  userIpLookup,
+  userResearcherAccess,
 ];

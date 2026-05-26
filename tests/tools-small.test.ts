@@ -228,6 +228,27 @@ describe("intigriti_company_assets_get_custom_fields handler", () => {
 });
 
 // ---------------------------------------------------------------------------
+// intigriti_company_assets_get_required_skills handler
+// ---------------------------------------------------------------------------
+
+describe("intigriti_company_assets_get_required_skills handler", () => {
+  const tool = companyAssetsTools.find(
+    (t) => t.name === "intigriti_company_assets_get_required_skills",
+  )!;
+
+  it("passes assetId as a path param", async () => {
+    const { client, calls } = makeStubClient();
+    await tool.handler({ assetId: "asset-77" }, client);
+
+    expect(calls[0]?.args.method).toBe("GET");
+    expect(calls[0]?.args.path).toBe(
+      "/v2.1/company-assets/{assetId}/required-skills",
+    );
+    expect(calls[0]?.args.pathParams).toEqual({ assetId: "asset-77" });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // intigriti_user_iplookup handler
 // ---------------------------------------------------------------------------
 

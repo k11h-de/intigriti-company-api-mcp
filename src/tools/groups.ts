@@ -1,4 +1,5 @@
-import type { ToolDef } from "./types.js";
+import type { ToolDef, AnyToolDef } from "./types.js";
+import { READ_ONLY_ANNOTATIONS } from "./types.js";
 import {
   GroupsListInputSchema,
   GroupsListSubmissionsInputSchema,
@@ -6,19 +7,12 @@ import {
   type GroupsListSubmissionsInput,
 } from "../schemas/groups.js";
 
-const READ_ONLY = {
-  readOnlyHint: true,
-  destructiveHint: false,
-  idempotentHint: true,
-  openWorldHint: true,
-} as const;
-
 const groupsList: ToolDef<GroupsListInput> = {
   name: "intigriti_groups_list",
   description:
     "List all groups configured for the company. Groups are organizational units used to bucket submissions by program/team.",
   inputSchema: GroupsListInputSchema,
-  annotations: READ_ONLY,
+  annotations: READ_ONLY_ANNOTATIONS,
   handler: (_input, client) =>
     client.request({ method: "GET", path: "/v2.1/groups" }),
 };
@@ -28,7 +22,7 @@ const groupsListSubmissions: ToolDef<GroupsListSubmissionsInput> = {
   description:
     "List submissions belonging to a specific group. Optionally filter by last-updated timestamp to retrieve only recently changed records.",
   inputSchema: GroupsListSubmissionsInputSchema,
-  annotations: READ_ONLY,
+  annotations: READ_ONLY_ANNOTATIONS,
   handler: (input, client) => {
     const query: Record<string, number | undefined> = {};
     if (input.updatedSince !== undefined) {
@@ -45,7 +39,7 @@ const groupsListSubmissions: ToolDef<GroupsListSubmissionsInput> = {
   },
 };
 
-export const groupsTools: ToolDef[] = [
-  groupsList as ToolDef,
-  groupsListSubmissions as ToolDef,
+export const groupsTools: AnyToolDef[] = [
+  groupsList,
+  groupsListSubmissions,
 ];
