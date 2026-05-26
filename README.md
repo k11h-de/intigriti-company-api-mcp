@@ -2,6 +2,8 @@
 
 An MCP server that exposes the Intigriti Company API to AI assistants, enabling programmatic management of bug bounty programs, submissions, reward system, and related workflows. Targets the v2.1 BETA of the Intigriti Company API — small breaking changes may land without a major version bump.
 
+> **First time setting up?** Follow the step-by-step [onboarding guide](docs/ONBOARDING.md). The rest of this README is reference documentation.
+
 ## Requirements
 
 - Node.js >= 20
