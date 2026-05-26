@@ -157,20 +157,17 @@ export function createClient(opts: ClientOptions): IntigritiClient {
     return fetchFn(url, init);
   }
 
-  async function requestRaw(
-    args: RequestArgs
-  ): Promise<{ status: number; body: unknown }> {
-    const url = buildUrl(opts.baseUrl, args.path, args.pathParams, args.query);
-    const token = await opts.tokenSource.getAccessToken();
-    const resp = await executeRequest(args, url, token);
-    const body = await readResponseBody(resp);
-    return { status: resp.status, body };
-  }
-
-  async function request<T = unknown>(args: RequestArgs): Promise<T> {
-    const url = buildUrl(opts.baseUrl, args.path, args.pathParams, args.query);
-
-    // Fetch with potential 429/403 retry
+  /**
+   * Shared retry/refresh path used by both `request` and `requestRaw`.
+   * Returns the final `{ resp, body }` after applying:
+   *   1. One retry on 429/403 (with `retryDelayMs` delay).
+   *   2. One token refresh + retry on 401 (when `tokenSource.refresh` exists).
+   */
+  async function executeWithRetryAndRefresh(
+    args: RequestArgs,
+    url: string
+  ): Promise<{ resp: Response; body: unknown }> {
+    // Inner helper: one attempt + one 429/403 retry with the same token.
     async function attemptWithRetry(token: string): Promise<Response> {
       const init = await buildInit(args.method, token, args.body, args.multipart);
       let resp = await fetchFn(url, init);
@@ -188,28 +185,37 @@ export function createClient(opts: ClientOptions): IntigritiClient {
     let resp = await attemptWithRetry(token);
 
     // Handle 401 with optional refresh
-    if (resp.status === 401) {
-      if (!opts.tokenSource.refresh) {
-        const body = await readResponseBody(resp);
-        throw new IntigritiApiError({ status: 401, body, url, method: args.method });
-      }
-
+    if (resp.status === 401 && opts.tokenSource.refresh) {
       await opts.tokenSource.refresh();
       token = await opts.tokenSource.getAccessToken();
       resp = await attemptWithRetry(token);
-
-      if (resp.status === 401) {
-        const body = await readResponseBody(resp);
-        throw new IntigritiApiError({ status: 401, body, url, method: args.method });
-      }
-    }
-
-    if (!resp.ok) {
-      const body = await readResponseBody(resp);
-      throw new IntigritiApiError({ status: resp.status, body, url, method: args.method });
     }
 
     const body = await readResponseBody(resp);
+    return { resp, body };
+  }
+
+  async function requestRaw(
+    args: RequestArgs
+  ): Promise<{ status: number; body: unknown }> {
+    const url = buildUrl(opts.baseUrl, args.path, args.pathParams, args.query);
+    const { resp, body } = await executeWithRetryAndRefresh(args, url);
+    return { status: resp.status, body };
+  }
+
+  async function request<T = unknown>(args: RequestArgs): Promise<T> {
+    const url = buildUrl(opts.baseUrl, args.path, args.pathParams, args.query);
+    const { resp, body } = await executeWithRetryAndRefresh(args, url);
+
+    // Handle 401 throw (no refresh, or refresh didn't help)
+    if (resp.status === 401) {
+      throw new IntigritiApiError({ status: 401, body, url, method: args.method });
+    }
+
+    if (!resp.ok) {
+      throw new IntigritiApiError({ status: resp.status, body, url, method: args.method });
+    }
+
     return body as T;
   }
 

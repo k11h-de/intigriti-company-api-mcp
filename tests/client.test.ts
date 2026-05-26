@@ -529,6 +529,156 @@ describe("requestRaw", () => {
     const raw = await client.requestRaw({ method: "GET", path: "/v2.1/items" });
     expect(raw.status).toBe(500);
   });
+
+  // -------------------------------------------------------------------------
+  // requestRaw – 429 retry
+  // -------------------------------------------------------------------------
+
+  it("retries once on 429 and returns the final { status, body }", async () => {
+    const { fetchImpl, calls } = makeFetch([
+      { status: 429, body: "rate limited" },
+      { status: 200, body: { ok: true } },
+    ]);
+
+    const sleepCalls: number[] = [];
+    const client = createClient({
+      baseUrl: "https://api.example.com",
+      tokenSource: makeTokenSource(),
+      fetchImpl: fetchImpl as typeof fetch,
+      retryDelayMs: 500,
+      sleep: async (ms: number) => { sleepCalls.push(ms); },
+    });
+
+    const raw = await client.requestRaw({ method: "GET", path: "/v2.1/items" });
+
+    expect(raw.status).toBe(200);
+    expect(raw.body).toEqual({ ok: true });
+    expect(calls.length).toBe(2);
+    expect(sleepCalls).toEqual([500]);
+  });
+
+  // -------------------------------------------------------------------------
+  // requestRaw – 403 retry
+  // -------------------------------------------------------------------------
+
+  it("retries once on 403 and returns the final { status, body }", async () => {
+    const { fetchImpl, calls } = makeFetch([
+      { status: 403, body: "forbidden" },
+      { status: 200, body: { allowed: true } },
+    ]);
+
+    const client = createClient({
+      baseUrl: "https://api.example.com",
+      tokenSource: makeTokenSource(),
+      fetchImpl: fetchImpl as typeof fetch,
+      retryDelayMs: 0,
+      sleep: async () => {},
+    });
+
+    const raw = await client.requestRaw({ method: "GET", path: "/v2.1/items" });
+
+    expect(raw.status).toBe(200);
+    expect(raw.body).toEqual({ allowed: true });
+    expect(calls.length).toBe(2);
+  });
+
+  // -------------------------------------------------------------------------
+  // requestRaw – 401 with refresh, retry succeeds (200)
+  // -------------------------------------------------------------------------
+
+  it("calls refresh() on 401 and returns 200 result when retry succeeds", async () => {
+    let currentToken = "old-token";
+    let refreshCalled = false;
+
+    const tokenSource: TokenSource = {
+      kind: "file",
+      getAccessToken: async () => currentToken,
+      refresh: async () => {
+        refreshCalled = true;
+        currentToken = "new-token";
+      },
+    };
+
+    const { fetchImpl, calls } = makeFetch([
+      { status: 401, body: { error: "unauthorized" } },
+      { status: 200, body: { data: "ok" } },
+    ]);
+
+    const client = createClient({
+      baseUrl: "https://api.example.com",
+      tokenSource,
+      fetchImpl: fetchImpl as typeof fetch,
+      retryDelayMs: 0,
+      sleep: async () => {},
+    });
+
+    const raw = await client.requestRaw({ method: "GET", path: "/v2.1/items" });
+
+    expect(raw.status).toBe(200);
+    expect(raw.body).toEqual({ data: "ok" });
+    expect(refreshCalled).toBe(true);
+    expect(calls.length).toBe(2);
+  });
+
+  // -------------------------------------------------------------------------
+  // requestRaw – 401 with refresh, retry still 401
+  // -------------------------------------------------------------------------
+
+  it("calls refresh() on 401 and returns { status: 401 } when retry is still 401", async () => {
+    let currentToken = "old-token";
+    let refreshCalled = false;
+
+    const tokenSource: TokenSource = {
+      kind: "file",
+      getAccessToken: async () => currentToken,
+      refresh: async () => {
+        refreshCalled = true;
+        currentToken = "new-token";
+      },
+    };
+
+    const { fetchImpl, calls } = makeFetch([
+      { status: 401, body: { error: "unauthorized" } },
+      { status: 401, body: { error: "still unauthorized" } },
+    ]);
+
+    const client = createClient({
+      baseUrl: "https://api.example.com",
+      tokenSource,
+      fetchImpl: fetchImpl as typeof fetch,
+      retryDelayMs: 0,
+      sleep: async () => {},
+    });
+
+    const raw = await client.requestRaw({ method: "GET", path: "/v2.1/items" });
+
+    expect(raw.status).toBe(401);
+    expect(refreshCalled).toBe(true);
+    expect(calls.length).toBe(2);
+  });
+
+  // -------------------------------------------------------------------------
+  // requestRaw – 401 without refresh (env source)
+  // -------------------------------------------------------------------------
+
+  it("returns { status: 401 } without calling refresh or extra fetches when no refresh exists", async () => {
+    const { fetchImpl, calls } = makeFetch([
+      { status: 401, body: { error: "unauthorized" } },
+    ]);
+
+    const client = createClient({
+      baseUrl: "https://api.example.com",
+      tokenSource: envTokenSource("env-token"),
+      fetchImpl: fetchImpl as typeof fetch,
+      retryDelayMs: 0,
+      sleep: async () => {},
+    });
+
+    const raw = await client.requestRaw({ method: "GET", path: "/v2.1/items" });
+
+    expect(raw.status).toBe(401);
+    expect(calls.length).toBe(1); // no extra fetch
+  });
 });
 
 // ---------------------------------------------------------------------------
