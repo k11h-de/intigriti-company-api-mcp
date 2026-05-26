@@ -22,3 +22,24 @@ export const READ_ONLY_ANNOTATIONS = {
   idempotentHint: true,
   openWorldHint: true,
 } as const satisfies ToolDef<never>["annotations"];
+
+export const MUTATION_NON_IDEMPOTENT = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: false,
+  openWorldHint: true,
+} as const satisfies ToolDef<never>["annotations"];
+
+export const MUTATION_IDEMPOTENT = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: true,
+} as const satisfies ToolDef<never>["annotations"];
+
+export const DESTRUCTIVE_IDEMPOTENT = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: true,
+  openWorldHint: true,
+} as const satisfies ToolDef<never>["annotations"];
