@@ -59,12 +59,13 @@ describe("wrapHandler — success", () => {
 // ---------------------------------------------------------------------------
 
 describe("wrapHandler — IntigritiApiError", () => {
-  it("returns isError:true, includes status + method + url, omits body secrets", async () => {
+  it("returns isError:true, includes status + method + url, omits plain-string body secrets", async () => {
+    const leakSentinel = "this-is-the-leakable-body-string";
     const client = makeClient({
       request: vi.fn().mockRejectedValue(
         new IntigritiApiError({
           status: 404,
-          body: { secret: "redacted-token" },
+          body: leakSentinel,
           url: "https://api.example.com/v2.1/submissions/X1",
           method: "GET",
         })
@@ -80,6 +81,27 @@ describe("wrapHandler — IntigritiApiError", () => {
     expect(text).toContain("404");
     expect(text).toContain("GET");
     expect(text).toContain("api.example.com");
+    expect(text).not.toContain(leakSentinel);
+  });
+
+  it("omits structured-object body secrets", async () => {
+    const client = makeClient({
+      request: vi.fn().mockRejectedValue(
+        new IntigritiApiError({
+          status: 403,
+          body: { secret: "redacted-token" },
+          url: "https://api.example.com/v2.1/submissions/X2",
+          method: "GET",
+        })
+      ),
+    });
+
+    const toolDef = ALL_TOOLS.find((t) => t.name === "intigriti_submissions_get")!;
+    const cb = wrapHandler(toolDef, client);
+    const result = await cb({ submissionCode: "X2" });
+
+    expect(result).toMatchObject({ isError: true });
+    const text: string = (result as any).content[0].text;
     expect(text).not.toContain("redacted-token");
   });
 });

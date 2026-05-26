@@ -7,9 +7,8 @@ import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 
 import { loadConfig } from "./config.js";
 import { resolveTokenSource } from "./auth/resolver.js";
-import { createClient } from "./client.js";
+import { createClient, type IntigritiClient } from "./client.js";
 import { IntigritiApiError } from "./errors.js";
-import type { IntigritiClient } from "./client.js";
 import type { AnyToolDef } from "./tools/types.js";
 
 import { submissionsTools } from "./tools/submissions.js";
@@ -21,6 +20,15 @@ import { groupsTools } from "./tools/groups.js";
 import { userTools } from "./tools/user.js";
 import { payoutsTools } from "./tools/payouts.js";
 import { submissionTypesTools } from "./tools/submission-types.js";
+
+// ---------------------------------------------------------------------------
+// Package metadata — read once at module scope.
+// ---------------------------------------------------------------------------
+
+const _require = createRequire(import.meta.url);
+const pkg = _require("../package.json") as { name: string; version: string };
+const SERVER_NAME = pkg.name;
+const SERVER_VERSION = pkg.version;
 
 // ---------------------------------------------------------------------------
 // All tool descriptors, in one flat array.
@@ -42,6 +50,7 @@ export const ALL_TOOLS: AnyToolDef[] = [
 // Uniform output envelope for every tool.
 // ---------------------------------------------------------------------------
 
+// v1: uniform envelope; per-tool narrow output schemas are a future enhancement.
 const RESULT_OUTPUT_SHAPE = { data: z.unknown() };
 
 // ---------------------------------------------------------------------------
@@ -64,7 +73,7 @@ export function wrapHandler(toolDef: AnyToolDef, client: IntigritiClient) {
       let text: string;
       if (err instanceof IntigritiApiError) {
         // Intentionally omit err.body — it may contain secrets.
-        text = `Intigriti API error ${err.status} on ${err.method} ${err.url}: ${err.message}`;
+        text = `Intigriti API error ${err.status} on ${err.method} ${err.url}`;
       } else {
         text = err instanceof Error ? err.message : String(err);
       }
@@ -82,12 +91,8 @@ export function wrapHandler(toolDef: AnyToolDef, client: IntigritiClient) {
 // ---------------------------------------------------------------------------
 
 export function buildServer(client: IntigritiClient): McpServer {
-  // Read version from package.json at runtime (works under NodeNext moduleResolution).
-  const require = createRequire(import.meta.url);
-  const pkg = require("../package.json") as { version: string };
-
   const server = new McpServer(
-    { name: "intigriti-company-api-mcp", version: pkg.version },
+    { name: SERVER_NAME, version: SERVER_VERSION },
   );
 
   for (const toolDef of ALL_TOOLS) {
@@ -124,6 +129,6 @@ async function main(): Promise<void> {
 
 main().catch((err: unknown) => {
   const message = err instanceof Error ? err.message : String(err);
-  process.stderr.write(`[intigriti-company-api-mcp] fatal: ${message}\n`);
+  process.stderr.write(`[${SERVER_NAME}] fatal: ${message}\n`);
   process.exitCode = 1;
 });
