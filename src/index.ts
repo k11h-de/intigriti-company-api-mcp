@@ -54,6 +54,26 @@ export const ALL_TOOLS: AnyToolDef[] = [
 const RESULT_OUTPUT_SHAPE = { data: z.unknown() };
 
 // ---------------------------------------------------------------------------
+// hintForStatus — short, generic hint appended to API error messages.
+// Kept narrow on purpose: only statuses where the raw code is genuinely
+// ambiguous get a hint. Anything else returns undefined and the caller
+// emits the bare "status / method / url" line.
+// ---------------------------------------------------------------------------
+
+function hintForStatus(status: number): string | undefined {
+  switch (status) {
+    case 401:
+      return "authentication failed; the token may be expired or invalid — re-run intigriti-mcp-login";
+    case 403:
+      return "forbidden — may be insufficient permissions or a submission-state restriction (e.g. assign/possible-groups are blocked while a submission is in Triage; validate it first via update_state with statusTrigger=2)";
+    case 429:
+      return "rate limited by the API; the client retries once automatically — try again shortly";
+    default:
+      return undefined;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // wrapHandler — pure helper; exported for unit-testing.
 //
 // Returns the registerTool callback for a given tool descriptor + client.
@@ -74,6 +94,10 @@ export function wrapHandler(toolDef: AnyToolDef, client: IntigritiClient) {
       if (err instanceof IntigritiApiError) {
         // Intentionally omit err.body — it may contain secrets.
         text = `Intigriti API error ${err.status} on ${err.method} ${err.url}`;
+        const hint = hintForStatus(err.status);
+        if (hint) {
+          text += ` — ${hint}`;
+        }
       } else {
         text = err instanceof Error ? err.message : String(err);
       }

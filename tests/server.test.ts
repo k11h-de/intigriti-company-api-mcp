@@ -84,6 +84,92 @@ describe("wrapHandler — IntigritiApiError", () => {
     expect(text).not.toContain(leakSentinel);
   });
 
+  it("appends a hint for 403 errors mentioning Triage state restriction", async () => {
+    const client = makeClient({
+      request: vi.fn().mockRejectedValue(
+        new IntigritiApiError({
+          status: 403,
+          body: null,
+          url: "https://api.example.com/v2.1/submissions/X1/assign/me",
+          method: "PUT",
+        })
+      ),
+    });
+
+    const toolDef = ALL_TOOLS.find(
+      (t) => t.name === "intigriti_submissions_assign_to_me",
+    )!;
+    const cb = wrapHandler(toolDef, client);
+    const result = await cb({ submissionCode: "X1" });
+
+    const text: string = (result as any).content[0].text;
+    expect(text).toContain("403");
+    expect(text).toMatch(/Triage|state|permissions/i);
+  });
+
+  it("appends a hint for 401 errors mentioning re-login", async () => {
+    const client = makeClient({
+      request: vi.fn().mockRejectedValue(
+        new IntigritiApiError({
+          status: 401,
+          body: null,
+          url: "https://api.example.com/v2.1/programs",
+          method: "GET",
+        })
+      ),
+    });
+
+    const toolDef = ALL_TOOLS.find((t) => t.name === "intigriti_programs_list")!;
+    const cb = wrapHandler(toolDef, client);
+    const result = await cb({});
+
+    const text: string = (result as any).content[0].text;
+    expect(text).toContain("401");
+    expect(text).toMatch(/intigriti-mcp-login|token/i);
+  });
+
+  it("appends a hint for 429 errors mentioning rate limiting", async () => {
+    const client = makeClient({
+      request: vi.fn().mockRejectedValue(
+        new IntigritiApiError({
+          status: 429,
+          body: null,
+          url: "https://api.example.com/v2.1/programs",
+          method: "GET",
+        })
+      ),
+    });
+
+    const toolDef = ALL_TOOLS.find((t) => t.name === "intigriti_programs_list")!;
+    const cb = wrapHandler(toolDef, client);
+    const result = await cb({});
+
+    const text: string = (result as any).content[0].text;
+    expect(text).toContain("429");
+    expect(text).toMatch(/rate/i);
+  });
+
+  it("does not append a hint for unknown statuses like 500", async () => {
+    const client = makeClient({
+      request: vi.fn().mockRejectedValue(
+        new IntigritiApiError({
+          status: 500,
+          body: null,
+          url: "https://api.example.com/v2.1/programs",
+          method: "GET",
+        })
+      ),
+    });
+
+    const toolDef = ALL_TOOLS.find((t) => t.name === "intigriti_programs_list")!;
+    const cb = wrapHandler(toolDef, client);
+    const result = await cb({});
+
+    const text: string = (result as any).content[0].text;
+    expect(text).toContain("500");
+    expect(text).not.toContain(" — ");
+  });
+
   it("omits structured-object body secrets", async () => {
     const client = makeClient({
       request: vi.fn().mockRejectedValue(
