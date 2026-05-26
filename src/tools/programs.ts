@@ -3,6 +3,7 @@ import {
   READ_ONLY_ANNOTATIONS,
   MUTATION_NON_IDEMPOTENT,
 } from "./types.js";
+import { isoToUnixSeconds } from "./utils.js";
 import {
   ProgramsListInputSchema,
   ProgramsGetInputSchema,
@@ -49,9 +50,7 @@ const programsListSubmissions: ToolDef<ProgramsListSubmissionsInput> = {
   handler: (input, client) => {
     const query: Record<string, number | undefined> = {};
     if (input.updatedSince !== undefined) {
-      query["UpdatedSince"] = Math.floor(
-        new Date(input.updatedSince).getTime() / 1000,
-      );
+      query["UpdatedSince"] = isoToUnixSeconds(input.updatedSince);
     }
     return client.request({
       method: "GET",

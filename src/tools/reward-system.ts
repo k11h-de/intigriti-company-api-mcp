@@ -4,6 +4,7 @@ import {
   MUTATION_NON_IDEMPOTENT,
   DESTRUCTIVE_IDEMPOTENT,
 } from "./types.js";
+import { isoToUnixSeconds } from "./utils.js";
 import {
   RewardSystemListRewardRequestsInputSchema,
   RewardSystemGetRewardRequestPayoutInputSchema,
@@ -29,14 +30,10 @@ const rewardSystemListRewardRequests: ToolDef<RewardSystemListRewardRequestsInpu
       if (input.limit !== undefined) query["Limit"] = input.limit;
       if (input.offset !== undefined) query["Offset"] = input.offset;
       if (input.createdSince !== undefined) {
-        query["CreatedSince"] = Math.floor(
-          new Date(input.createdSince).getTime() / 1000,
-        );
+        query["CreatedSince"] = isoToUnixSeconds(input.createdSince);
       }
       if (input.updatedSince !== undefined) {
-        query["UpdatedSince"] = Math.floor(
-          new Date(input.updatedSince).getTime() / 1000,
-        );
+        query["UpdatedSince"] = isoToUnixSeconds(input.updatedSince);
       }
       return client.request({
         method: "GET",

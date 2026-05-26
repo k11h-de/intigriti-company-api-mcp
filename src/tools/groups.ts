@@ -1,5 +1,6 @@
 import type { ToolDef, AnyToolDef } from "./types.js";
 import { READ_ONLY_ANNOTATIONS } from "./types.js";
+import { isoToUnixSeconds } from "./utils.js";
 import {
   GroupsListInputSchema,
   GroupsListSubmissionsInputSchema,
@@ -26,9 +27,7 @@ const groupsListSubmissions: ToolDef<GroupsListSubmissionsInput> = {
   handler: (input, client) => {
     const query: Record<string, number | undefined> = {};
     if (input.updatedSince !== undefined) {
-      query["UpdatedSince"] = Math.floor(
-        new Date(input.updatedSince).getTime() / 1000,
-      );
+      query["UpdatedSince"] = isoToUnixSeconds(input.updatedSince);
     }
     return client.request({
       method: "GET",
