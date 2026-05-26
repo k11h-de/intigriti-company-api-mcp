@@ -58,7 +58,9 @@ export async function exchangeCode(opts: {
 
   if (!resp.ok) {
     const text = await resp.text();
-    throw new Error(`Token exchange failed: ${resp.status} ${text}`);
+    const err = new Error(`Token exchange failed: HTTP ${resp.status}`);
+    Object.assign(err, { body: text });
+    throw err;
   }
 
   const data = (await resp.json()) as Record<string, unknown>;
@@ -88,16 +90,25 @@ export async function refreshAccessToken(opts: {
 
   if (!resp.ok) {
     const text = await resp.text();
-    throw new Error(`Token refresh failed: ${resp.status} ${text}`);
+    const err = new Error(`Token refresh failed: HTTP ${resp.status}`);
+    Object.assign(err, { body: text });
+    throw err;
   }
 
   const data = (await resp.json()) as Record<string, unknown>;
-  return buildCredentials(data, opts.clientId);
+  const built = buildCredentials(data, opts.clientId);
+  if (built.refresh_token === undefined) {
+    built.refresh_token = opts.refreshToken;
+  }
+  return built;
 }
 
 function buildCredentials(data: Record<string, unknown>, clientId: string): Credentials {
+  if (typeof data["access_token"] !== "string") {
+    throw new Error("Token response missing access_token");
+  }
   const creds: Credentials = {
-    access_token: data["access_token"] as string,
+    access_token: data["access_token"],
     client_id: clientId,
   };
   if (typeof data["refresh_token"] === "string") {

@@ -233,7 +233,7 @@ describe("exchangeCode", () => {
     expect(creds.expires_at).toBeUndefined();
   });
 
-  it("throws Error with status and body on non-2xx", async () => {
+  it("throws Error with status on non-2xx (body not in message)", async () => {
     const fetchImpl = makeFetch(400, { error: "invalid_grant" });
 
     await expect(
@@ -245,6 +245,37 @@ describe("exchangeCode", () => {
         fetchImpl,
       })
     ).rejects.toThrow("400");
+  });
+
+  it("rejects when server response is missing access_token", async () => {
+    const fetchImpl = makeFetch(200, { token_type: "Bearer" });
+
+    await expect(
+      exchangeCode({
+        clientId: "cid",
+        redirectUri: "http://localhost/cb",
+        code: "mycode",
+        codeVerifier: "myverifier",
+        fetchImpl,
+      })
+    ).rejects.toThrow("access_token");
+  });
+
+  it("error message does not contain response body on 400", async () => {
+    const fetchImpl = makeFetch(400, "sensitive-content");
+
+    await expect(
+      exchangeCode({
+        clientId: "cid",
+        redirectUri: "http://localhost/cb",
+        code: "badcode",
+        codeVerifier: "verifier",
+        fetchImpl,
+      })
+    ).rejects.toSatisfy((err: unknown) => {
+      const e = err as Error;
+      return e.message.includes("400") && !e.message.includes("sensitive-content");
+    });
   });
 });
 
@@ -299,7 +330,7 @@ describe("refreshAccessToken", () => {
     expect(creds.refresh_token).toBe("rotated-refresh");
   });
 
-  it("falls back gracefully when response has no refresh_token", async () => {
+  it("falls back to input refresh_token when response has no refresh_token", async () => {
     const resp = makeTokenResponse();
     delete (resp as Record<string, unknown>)["refresh_token"];
     const fetchImpl = makeFetch(200, resp);
@@ -310,7 +341,7 @@ describe("refreshAccessToken", () => {
       fetchImpl,
     });
 
-    expect(creds.refresh_token).toBeUndefined();
+    expect(creds.refresh_token).toBe("old-refresh");
     expect(creds.access_token).toBe("new-access");
   });
 

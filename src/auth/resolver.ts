@@ -5,7 +5,6 @@ import { refreshAccessToken } from "./oauth.js";
 export interface TokenSource {
   kind: "env" | "file";
   getAccessToken(): Promise<string>;
-  onRefresh?(creds: Credentials): Promise<void>;
   refresh?(): Promise<void>;
 }
 

@@ -24,9 +24,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   let loginPort = 8765;
   if (rawPort !== undefined) {
     const parsed = parseInt(rawPort, 10);
-    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535 || String(parsed) !== rawPort.trim()) {
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535 || String(parsed) !== rawPort) {
       throw new Error(
-        `INTIGRITI_LOGIN_PORT must be an integer between 1 and 65535, got: ${rawPort}`
+        `INTIGRITI_LOGIN_PORT must be a bare integer between 1 and 65535, got: ${rawPort}`
       );
     }
     loginPort = parsed;

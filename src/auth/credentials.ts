@@ -34,7 +34,7 @@ export async function writeCredentials(path: string, creds: Credentials): Promis
   const dir = dirname(path);
   await mkdir(dir, { recursive: true });
 
-  const tmp = `${path}.tmp`;
+  const tmp = `${path}.tmp.${process.pid}.${Date.now()}`;
   await writeFile(tmp, JSON.stringify(creds, null, 2), "utf8");
   await chmod(tmp, 0o600);
   await rename(tmp, path);
