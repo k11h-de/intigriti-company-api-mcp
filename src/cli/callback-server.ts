@@ -5,6 +5,7 @@ export interface AwaitCallbackOptions {
   expectedState: string;
   callbackPath?: string;
   timeoutMs?: number;
+  onListening?: (info: { port: number; address: string }) => void;
 }
 
 export interface CallbackResult {
@@ -15,11 +16,34 @@ export interface CallbackResult {
  * Starts a local HTTP server on loopback (127.0.0.1) and waits for the OAuth
  * callback. Resolves with `{ code }` on success, rejects on error or timeout.
  * The server is always closed before the promise settles.
+ *
+ * The optional `onListening` callback is invoked once the server is confirmed
+ * to be accepting connections — use this to print/open the authorize URL so
+ * it is never shown before the server is ready.
  */
 export function awaitCallback(opts: AwaitCallbackOptions): Promise<CallbackResult> {
-  const { port, expectedState, callbackPath = "/callback", timeoutMs = 5 * 60 * 1000 } = opts;
+  const {
+    port,
+    expectedState,
+    callbackPath = "/callback",
+    timeoutMs = 5 * 60 * 1000,
+    onListening,
+  } = opts;
 
   return new Promise<CallbackResult>((resolve, reject) => {
+    let settled = false;
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
+    function cleanup(): void {
+      if (settled) return;
+      settled = true;
+      if (timeoutHandle !== undefined) {
+        clearTimeout(timeoutHandle);
+        timeoutHandle = undefined;
+      }
+      server.close();
+    }
+
     const server = http.createServer((req, res) => {
       const rawUrl = req.url ?? "/";
       const parsedUrl = new URL(rawUrl, `http://127.0.0.1:${port}`);
@@ -93,19 +117,6 @@ export function awaitCallback(opts: AwaitCallbackOptions): Promise<CallbackResul
       resolve({ code });
     });
 
-    let settled = false;
-    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
-
-    function cleanup(): void {
-      if (settled) return;
-      settled = true;
-      if (timeoutHandle !== undefined) {
-        clearTimeout(timeoutHandle);
-        timeoutHandle = undefined;
-      }
-      server.close();
-    }
-
     timeoutHandle = setTimeout(() => {
       if (settled) return;
       cleanup();
@@ -123,21 +134,12 @@ export function awaitCallback(opts: AwaitCallbackOptions): Promise<CallbackResul
     });
 
     server.listen(port, "127.0.0.1", () => {
-      // Server is ready; the caller can now open the browser.
+      const addr = server.address();
+      if (addr !== null && typeof addr !== "string" && onListening) {
+        onListening({ port: addr.port, address: addr.address });
+      }
     });
   });
-}
-
-/**
- * Returns the address the server is actually bound to, useful when port 0 was
- * requested and the OS assigned a free port.
- */
-export function getServerPort(server: http.Server): number {
-  const addr = server.address();
-  if (addr === null || typeof addr === "string") {
-    throw new Error("Server is not bound to a TCP port");
-  }
-  return addr.port;
 }
 
 function htmlPage(title: string, body: string): string {

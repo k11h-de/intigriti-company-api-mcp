@@ -24,18 +24,23 @@ async function main(): Promise<void> {
 
     const authorizeUrl = buildAuthorizeUrl({ clientId, redirectUri, state, codeChallenge });
 
-    process.stderr.write("Open this URL in your browser to sign in:\n");
-    process.stderr.write(`${authorizeUrl}\n`);
-
     let code: string;
     try {
       const result = await awaitCallback({
         port: loginPort,
         expectedState: state,
+        onListening: () => {
+          // Print the URL only after the server is confirmed listening so the
+          // browser never gets a connection-refused if the user clicks quickly.
+          process.stderr.write("Open this URL in your browser to sign in:\n");
+          process.stderr.write(`${authorizeUrl}\n`);
+        },
       });
       code = result.code;
     } catch (err) {
-      process.stderr.write(`Login failed: ${(err as Error).message}\n`);
+      process.stderr.write(
+        `Login failed: ${err instanceof Error ? err.message : String(err)}\n`
+      );
       process.exitCode = 1;
       return;
     }
@@ -58,7 +63,9 @@ async function main(): Promise<void> {
       process.stderr.write(`Expires at: ${new Date(creds.expires_at).toISOString()}\n`);
     }
   } catch (err) {
-    process.stderr.write(`Error: ${(err as Error).message}\n`);
+    process.stderr.write(
+      `Error: ${err instanceof Error ? err.message : String(err)}\n`
+    );
     process.exitCode = 1;
   }
 }

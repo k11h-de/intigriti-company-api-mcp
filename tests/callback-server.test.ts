@@ -36,10 +36,11 @@ describe("awaitCallback", () => {
     const port = await findFreePort();
     const expectedState = "test-state-abc";
 
-    const promise = awaitCallback({ port, expectedState });
-
-    // Give the server a moment to start
-    await new Promise((r) => setTimeout(r, 20));
+    let callbackPromise!: ReturnType<typeof awaitCallback>;
+    const ready = new Promise<{ port: number; address: string }>((resolve) => {
+      callbackPromise = awaitCallback({ port, expectedState, onListening: resolve });
+    });
+    await ready;
 
     const { status, body } = await httpGet(
       `http://127.0.0.1:${port}/callback?code=goodcode&state=${expectedState}`
@@ -48,7 +49,7 @@ describe("awaitCallback", () => {
     expect(status).toBe(200);
     expect(body).toContain("You may close this tab");
 
-    const result = await promise;
+    const result = await callbackPromise;
     expect(result).toEqual({ code: "goodcode" });
   });
 
@@ -56,14 +57,16 @@ describe("awaitCallback", () => {
     const port = await findFreePort();
     const expectedState = "correct-state";
 
-    const promise = awaitCallback({ port, expectedState });
+    let callbackPromise!: ReturnType<typeof awaitCallback>;
+    const ready = new Promise<{ port: number; address: string }>((resolve) => {
+      callbackPromise = awaitCallback({ port, expectedState, onListening: resolve });
+    });
     // Attach rejection handler immediately so Vitest doesn't see an unhandled rejection
-    const settled = promise.then(
+    const settled = callbackPromise.then(
       () => ({ ok: true as const }),
       (err: unknown) => ({ ok: false as const, err })
     );
-
-    await new Promise((r) => setTimeout(r, 20));
+    await ready;
 
     const { status, body } = await httpGet(
       `http://127.0.0.1:${port}/callback?code=abc&state=WRONG`
@@ -83,14 +86,16 @@ describe("awaitCallback", () => {
     const port = await findFreePort();
     const expectedState = "some-state";
 
-    const promise = awaitCallback({ port, expectedState });
+    let callbackPromise!: ReturnType<typeof awaitCallback>;
+    const ready = new Promise<{ port: number; address: string }>((resolve) => {
+      callbackPromise = awaitCallback({ port, expectedState, onListening: resolve });
+    });
     // Attach rejection handler immediately so Vitest doesn't see an unhandled rejection
-    const settled = promise.then(
+    const settled = callbackPromise.then(
       () => ({ ok: true as const }),
       (err: unknown) => ({ ok: false as const, err })
     );
-
-    await new Promise((r) => setTimeout(r, 20));
+    await ready;
 
     const { status } = await httpGet(
       `http://127.0.0.1:${port}/callback?error=access_denied&state=${expectedState}`
@@ -109,9 +114,16 @@ describe("awaitCallback", () => {
     const port = await findFreePort();
     const expectedState = "pending-state";
 
-    const promise = awaitCallback({ port, expectedState, timeoutMs: 500 });
-
-    await new Promise((r) => setTimeout(r, 20));
+    let callbackPromise!: ReturnType<typeof awaitCallback>;
+    const ready = new Promise<{ port: number; address: string }>((resolve) => {
+      callbackPromise = awaitCallback({
+        port,
+        expectedState,
+        timeoutMs: 500,
+        onListening: resolve,
+      });
+    });
+    await ready;
 
     const { status } = await httpGet(`http://127.0.0.1:${port}/something-else`);
     expect(status).toBe(404);
@@ -121,7 +133,7 @@ describe("awaitCallback", () => {
       `http://127.0.0.1:${port}/callback?code=finalcode&state=${expectedState}`
     );
 
-    const result = await promise;
+    const result = await callbackPromise;
     expect(result.code).toBe("finalcode");
   });
 
@@ -143,13 +155,22 @@ describe("awaitCallback", () => {
   it("binds to 127.0.0.1 loopback address", async () => {
     const port = await findFreePort();
     const expectedState = "loopback-state";
-    const promise = awaitCallback({ port, expectedState, timeoutMs: 500 });
 
-    await new Promise((r) => setTimeout(r, 20));
+    let callbackPromise!: ReturnType<typeof awaitCallback>;
+    const ready = new Promise<{ port: number; address: string }>((resolve) => {
+      callbackPromise = awaitCallback({
+        port,
+        expectedState,
+        timeoutMs: 500,
+        onListening: resolve,
+      });
+    });
+    const listenInfo = await ready;
 
-    // Verify by checking that the server was actually started and reachable
-    // (we can't easily verify 127.0.0.1 bind from the outside in all test environments,
-    // but we assert that a connection to 127.0.0.1 works, which would fail if bound elsewhere)
+    // Assert the bind address directly from the onListening callback
+    expect(listenInfo.address).toBe("127.0.0.1");
+
+    // Also verify that a connection to 127.0.0.1 works
     const { status } = await httpGet(`http://127.0.0.1:${port}/something`);
     expect(status).toBe(404);
 
@@ -157,7 +178,7 @@ describe("awaitCallback", () => {
     await httpGet(
       `http://127.0.0.1:${port}/callback?code=loopback-code&state=${expectedState}`
     );
-    const result = await promise;
+    const result = await callbackPromise;
     expect(result.code).toBe("loopback-code");
   });
 });
