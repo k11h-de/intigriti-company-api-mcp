@@ -591,10 +591,21 @@ describe("intigriti_submissions_export_csv handler", () => {
     )) as Record<string, unknown>;
 
     expect(result["path"]).toBe(outputPath);
+    expect(result["bytes"]).toBe(Buffer.from(fakeBase64, "base64").length);
     expect(result["mimeType"]).toBe("text/csv");
 
     const written = await readFile(outputPath);
     expect(written).toEqual(Buffer.from(fakeBase64, "base64"));
+  });
+
+  it("passes timeZone as query parameter", async () => {
+    const { client, calls } = makeStubClient(fakeBase64);
+    await tool.handler(
+      { submissionCode: "SUB-060", timeZone: "America/New_York" },
+      client,
+    );
+
+    expect(calls[0]?.args.query?.["timeZone"]).toBe("America/New_York");
   });
 
   it("POSTs to correct path with mimeType text/csv", async () => {
