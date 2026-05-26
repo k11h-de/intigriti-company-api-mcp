@@ -27,7 +27,7 @@ Required token scopes depend on which tools you use:
 | `reward_system:read` | reward request and payout read tools |
 | `reward_system:write` | reward request and payout write tools |
 
-`offline_access` is only needed for Path B (refresh tokens).
+The login helper (Path B) additionally requests `offline_access` so it can obtain a refresh token.
 
 ### Path B: OAuth login helper (PKCE)
 
@@ -42,10 +42,6 @@ Run the login helper once. It opens an OAuth Authorization Code + PKCE flow, exc
 **Run the login helper:**
 
 ```bash
-# Using the primary bin name:
-npx intigriti-company-api-mcp login
-
-# Or using the dedicated login bin:
 npx intigriti-mcp-login
 ```
 
