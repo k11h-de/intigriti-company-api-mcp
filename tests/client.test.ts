@@ -306,7 +306,7 @@ describe("Response handling", () => {
     expect(caught?.status).toBe(422);
     expect(caught?.method).toBe("POST");
     expect(caught?.url).toContain("/v2.1/items");
-    expect(caught?.body).toBeDefined();
+    expect(caught?.body).toBe("Validation error");
   });
 });
 

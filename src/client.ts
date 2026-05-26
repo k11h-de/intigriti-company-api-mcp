@@ -56,15 +56,7 @@ function buildUrl(
     return encodeURIComponent(String(val));
   });
 
-  // 2. Check for any remaining placeholders
-  const remaining = resolvedPath.match(/\{[^}]+\}/);
-  if (remaining) {
-    throw new Error(
-      `URL placeholder ${remaining[0]} has no matching value in pathParams`
-    );
-  }
-
-  // 3. Build query string
+  // 2. Build query string
   const qs = new URLSearchParams();
   if (query) {
     for (const [k, v] of Object.entries(query)) {
@@ -104,12 +96,13 @@ async function readResponseBody(resp: Response): Promise<unknown> {
 // Core fetch wrapper
 // ---------------------------------------------------------------------------
 
-async function buildInit(
+function buildInit(
   method: string,
   token: string,
   body: unknown,
-  multipart: RequestArgs["multipart"]
-): Promise<RequestInit> {
+  multipart: RequestArgs["multipart"],
+  fileBuffer?: Buffer
+): RequestInit {
   if (body !== undefined && multipart !== undefined) {
     throw new Error(
       "body and multipart are mutually exclusive — set at most one"
@@ -126,7 +119,7 @@ async function buildInit(
   }
 
   if (multipart !== undefined) {
-    const buf = await readFile(multipart.filePath);
+    const buf = fileBuffer! as unknown as ArrayBuffer;
     const blob = new Blob([buf], {
       type: multipart.contentType ?? "application/octet-stream",
     });
@@ -148,15 +141,6 @@ export function createClient(opts: ClientOptions): IntigritiClient {
   const retryDelayMs = opts.retryDelayMs ?? 30_000;
   const sleepFn = opts.sleep ?? defaultSleep;
 
-  async function executeRequest(
-    args: RequestArgs,
-    url: string,
-    token: string
-  ): Promise<Response> {
-    const init = await buildInit(args.method, token, args.body, args.multipart);
-    return fetchFn(url, init);
-  }
-
   /**
    * Shared retry/refresh path used by both `request` and `requestRaw`.
    * Returns the final `{ resp, body }` after applying:
@@ -167,14 +151,16 @@ export function createClient(opts: ClientOptions): IntigritiClient {
     args: RequestArgs,
     url: string
   ): Promise<{ resp: Response; body: unknown }> {
+    const fileBuffer = args.multipart ? await readFile(args.multipart.filePath) : undefined;
+
     // Inner helper: one attempt + one 429/403 retry with the same token.
     async function attemptWithRetry(token: string): Promise<Response> {
-      const init = await buildInit(args.method, token, args.body, args.multipart);
+      const init = buildInit(args.method, token, args.body, args.multipart, fileBuffer);
       let resp = await fetchFn(url, init);
 
       if (resp.status === 429 || resp.status === 403) {
         await sleepFn(retryDelayMs);
-        const retryInit = await buildInit(args.method, token, args.body, args.multipart);
+        const retryInit = buildInit(args.method, token, args.body, args.multipart, fileBuffer);
         resp = await fetchFn(url, retryInit);
       }
 
