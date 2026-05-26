@@ -1,6 +1,6 @@
 {
   "name": "intigriti-company-api-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP server for the Intigriti Company API v2.1",
   "license": "MIT",
   "private": false,
