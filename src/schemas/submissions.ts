@@ -241,6 +241,22 @@ export type SubmissionsSetCustomBountyInput = z.infer<
 // Mutations — PUTs
 // ---------------------------------------------------------------------------
 
+// Status trigger IDs and close reason IDs are not enumerated in the Intigriti
+// swagger; they're only described narratively at
+// https://intigriti.readme.io/v2.1/reference/submissions_editstate.
+// Re-stating them here so callers don't need to round-trip the docs.
+//
+// Status triggers:
+//   1 = Reject    (Triage/Pending → Closed; closeReason required)
+//   2 = Validate  (Triage → Pending; irreversible)
+//   3 = Accept    (Pending → Accepted; may trigger bounty payout)
+//   4 = Close     (Accepted → Closed; auto-sets closeReason "Resolved")
+//   5 = Archive   (Closed → Archived)
+//   6 = Undo      (varies; check the docs' undo grid for which reverses are allowed)
+//
+// Close reasons:
+//   1 = Resolved, 2 = Duplicate, 3 = Accepted risk, 4 = Informative,
+//   5 = Out of scope, 6 = Spam, 7 = Not applicable
 export const SubmissionsUpdateStateInputSchema = z.object({
   submissionCode: z
     .string()
@@ -250,13 +266,17 @@ export const SubmissionsUpdateStateInputSchema = z.object({
     .number()
     .int()
     .optional()
-    .describe("Numeric identifier of the status transition trigger"),
+    .describe(
+      "Status transition trigger ID. 1=Reject (closeReason required), 2=Validate, 3=Accept (may trigger payout), 4=Close, 5=Archive, 6=Undo. See https://intigriti.readme.io/v2.1/reference/submissions_editstate for the state machine and undo grid.",
+    ),
   closeReason: z
     .number()
     .int()
     .nullable()
     .optional()
-    .describe("Numeric close-reason identifier; null to clear"),
+    .describe(
+      "Close-reason ID — required when statusTrigger=1 (Reject). 1=Resolved, 2=Duplicate, 3=Accepted risk, 4=Informative, 5=Out of scope, 6=Spam, 7=Not applicable. Pass null to clear. When closing as duplicate, also set duplicateSubmission to the parent submission code.",
+    ),
   duplicateSubmission: z
     .string()
     .nullable()
@@ -274,12 +294,14 @@ export const SubmissionsUpdateInternalReferenceInputSchema = z.object({
     .describe("Unique code identifying the submission"),
   reference: z
     .string()
+    .nullable()
     .optional()
-    .describe("Internal reference string to set on the submission"),
+    .describe("Internal reference string to set on the submission. Pass null or an empty string to clear."),
   url: z
     .string()
+    .nullable()
     .optional()
-    .describe("URL for the internal reference"),
+    .describe("URL for the internal reference. Pass null or an empty string to clear."),
 }).strict();
 export type SubmissionsUpdateInternalReferenceInput = z.infer<
   typeof SubmissionsUpdateInternalReferenceInputSchema

@@ -386,6 +386,120 @@ describe("intigriti_submissions_assign_to_me handler", () => {
 });
 
 // ---------------------------------------------------------------------------
+// PUT — update_state (validates closeReason on Reject)
+// ---------------------------------------------------------------------------
+
+describe("intigriti_submissions_update_state handler", () => {
+  const tool = submissionsTools.find(
+    (t) => t.name === "intigriti_submissions_update_state",
+  )!;
+
+  it("PUTs with statusTrigger and closeReason in body for Reject", async () => {
+    const { client, calls } = makeStubClient();
+    await tool.handler(
+      { submissionCode: "SUB-100", statusTrigger: 1, closeReason: 4 },
+      client,
+    );
+
+    expect(calls[0]?.args.method).toBe("PUT");
+    expect(calls[0]?.args.path).toBe("/v2.1/submissions/{submissionCode}/state");
+    const body = calls[0]?.args.body as Record<string, unknown>;
+    expect(body["statusTrigger"]).toBe(1);
+    expect(body["closeReason"]).toBe(4);
+    expect(body).not.toHaveProperty("submissionCode");
+  });
+
+  it("throws when statusTrigger=1 (Reject) without closeReason", async () => {
+    const { client, calls } = makeStubClient();
+    await expect(
+      tool.handler({ submissionCode: "SUB-100", statusTrigger: 1 }, client),
+    ).rejects.toThrow(/closeReason is required/);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("throws when statusTrigger=1 (Reject) with closeReason=null", async () => {
+    const { client, calls } = makeStubClient();
+    await expect(
+      tool.handler(
+        { submissionCode: "SUB-100", statusTrigger: 1, closeReason: null },
+        client,
+      ),
+    ).rejects.toThrow(/closeReason is required/);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("does not require closeReason for non-Reject triggers", async () => {
+    const { client, calls } = makeStubClient();
+    await tool.handler(
+      { submissionCode: "SUB-100", statusTrigger: 2 },
+      client,
+    );
+    expect(calls).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PUT — update_internal_reference (normalizes "" → null)
+// ---------------------------------------------------------------------------
+
+describe("intigriti_submissions_update_internal_reference handler", () => {
+  const tool = submissionsTools.find(
+    (t) => t.name === "intigriti_submissions_update_internal_reference",
+  )!;
+
+  it("normalizes empty-string reference and url to null", async () => {
+    const { client, calls } = makeStubClient();
+    await tool.handler(
+      { submissionCode: "SUB-101", reference: "", url: "" },
+      client,
+    );
+
+    const body = calls[0]?.args.body as Record<string, unknown>;
+    expect(body["reference"]).toBeNull();
+    expect(body["url"]).toBeNull();
+  });
+
+  it("passes through null for explicit clears", async () => {
+    const { client, calls } = makeStubClient();
+    await tool.handler(
+      { submissionCode: "SUB-101", reference: null, url: null },
+      client,
+    );
+
+    const body = calls[0]?.args.body as Record<string, unknown>;
+    expect(body["reference"]).toBeNull();
+    expect(body["url"]).toBeNull();
+  });
+
+  it("sends null for missing fields rather than omitting them", async () => {
+    const { client, calls } = makeStubClient();
+    await tool.handler({ submissionCode: "SUB-101" }, client);
+
+    const body = calls[0]?.args.body as Record<string, unknown>;
+    expect(body).toHaveProperty("reference");
+    expect(body).toHaveProperty("url");
+    expect(body["reference"]).toBeNull();
+    expect(body["url"]).toBeNull();
+  });
+
+  it("preserves non-empty strings", async () => {
+    const { client, calls } = makeStubClient();
+    await tool.handler(
+      {
+        submissionCode: "SUB-101",
+        reference: "JIRA-123",
+        url: "https://jira.example.com/JIRA-123",
+      },
+      client,
+    );
+
+    const body = calls[0]?.args.body as Record<string, unknown>;
+    expect(body["reference"]).toBe("JIRA-123");
+    expect(body["url"]).toBe("https://jira.example.com/JIRA-123");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // PUT with body — update_group (nullable groupId)
 // ---------------------------------------------------------------------------
 

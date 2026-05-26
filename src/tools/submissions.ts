@@ -144,7 +144,7 @@ const submissionsGetPossibleGroups: ToolDef<SubmissionsGetPossibleGroupsInput> =
   {
     name: "intigriti_submissions_get_possible_groups",
     description:
-      "List all groups that a submission can be assigned to.",
+      "List all groups that a submission can be assigned to. Returns 403 while the submission is in Triage status — validate it first via update_state with statusTrigger=2.",
     inputSchema: SubmissionsGetPossibleGroupsInputSchema,
     annotations: READ_ONLY_ANNOTATIONS,
     handler: (input, client) =>
@@ -259,7 +259,7 @@ const submissionsPlaceInternalMessage: ToolDef<SubmissionsPlaceInternalMessageIn
   {
     name: "intigriti_submissions_place_internal_message",
     description:
-      "Post an internal (company-only) message on a submission.",
+      "Post an internal (company-only) message on a submission. Append-only — the API does not expose deletion of messages, so the post will remain in the activity log permanently.",
     inputSchema: SubmissionsPlaceInternalMessageInputSchema,
     annotations: MUTATION_NON_IDEMPOTENT,
     handler: (input, client) => {
@@ -277,7 +277,7 @@ const submissionsPlaceExternalMessage: ToolDef<SubmissionsPlaceExternalMessageIn
   {
     name: "intigriti_submissions_place_external_message",
     description:
-      "Post an external (visible to researcher) message on a submission.",
+      "Post an external message on a submission, visible to the researcher. The researcher receives a notification. Append-only — the API does not expose deletion of messages, so the post will remain in the activity log permanently.",
     inputSchema: SubmissionsPlaceExternalMessageInputSchema,
     annotations: MUTATION_NON_IDEMPOTENT,
     handler: (input, client) => {
@@ -330,10 +330,17 @@ const submissionsSetCustomBounty: ToolDef<SubmissionsSetCustomBountyInput> = {
 const submissionsUpdateState: ToolDef<SubmissionsUpdateStateInput> = {
   name: "intigriti_submissions_update_state",
   description:
-    "Update the state of a submission, optionally specifying a close reason or duplicate reference.",
+    "Update the state of a submission via a status transition trigger. Triggers: 1=Reject (closeReason required), 2=Validate (irreversible), 3=Accept (may auto-create bounty payout), 4=Close, 5=Archive, 6=Undo. Close reasons: 1=Resolved, 2=Duplicate, 3=Accepted risk, 4=Informative, 5=Out of scope, 6=Spam, 7=Not applicable. State machine: https://intigriti.readme.io/v2.1/reference/submissions_editstate. Common 403 cause: the trigger is not allowed in the submission's current status.",
   inputSchema: SubmissionsUpdateStateInputSchema,
   annotations: MUTATION_IDEMPOTENT,
-  handler: (input, client) => {
+  handler: async (input, client) => {
+    // Reject (1) requires a closeReason. The API enforces this with a 400; we
+    // catch it here for a clearer message and to skip the round-trip.
+    if (input.statusTrigger === 1 && (input.closeReason === undefined || input.closeReason === null)) {
+      throw new Error(
+        "closeReason is required when statusTrigger=1 (Reject). Valid IDs: 1=Resolved, 2=Duplicate, 3=Accepted risk, 4=Informative, 5=Out of scope, 6=Spam, 7=Not applicable.",
+      );
+    }
     const { submissionCode, ...body } = input;
     return client.request({
       method: "PUT",
@@ -348,16 +355,20 @@ const submissionsUpdateInternalReference: ToolDef<SubmissionsUpdateInternalRefer
   {
     name: "intigriti_submissions_update_internal_reference",
     description:
-      "Update the internal reference and/or URL on a submission.",
+      "Update the internal reference and/or URL on a submission. Pass null or empty string to clear a field.",
     inputSchema: SubmissionsUpdateInternalReferenceInputSchema,
     annotations: MUTATION_IDEMPOTENT,
     handler: (input, client) => {
-      const { submissionCode, ...body } = input;
+      // The API stores empty strings literally rather than treating them as
+      // cleared. Normalize "" → null so callers passing an empty string get the
+      // intuitive clear semantics.
+      const reference = input.reference === "" ? null : input.reference ?? null;
+      const url = input.url === "" ? null : input.url ?? null;
       return client.request({
         method: "PUT",
         path: "/v2.1/submissions/{submissionCode}/internal-reference",
-        pathParams: { submissionCode },
-        body,
+        pathParams: { submissionCode: input.submissionCode },
+        body: { reference, url },
       });
     },
   };
@@ -381,7 +392,8 @@ const submissionsUpdateSeverity: ToolDef<SubmissionsUpdateSeverityInput> = {
 
 const submissionsAssignToMe: ToolDef<SubmissionsAssignToMeInput> = {
   name: "intigriti_submissions_assign_to_me",
-  description: "Assign a submission to the currently authenticated user.",
+  description:
+    "Assign a submission to the currently authenticated user. Returns 403 while the submission is in Triage status (Intigriti is reviewing it) — validate it first via update_state with statusTrigger=2.",
   inputSchema: SubmissionsAssignToMeInputSchema,
   annotations: MUTATION_IDEMPOTENT,
   handler: (input, client) =>
