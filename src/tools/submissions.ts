@@ -181,24 +181,28 @@ const submissionsExportPdf: ToolDef<SubmissionsExportPdfInput> = {
     "Export a submission as a PDF file. Returns base64-encoded content or writes to outputPath when provided.",
   inputSchema: SubmissionsExportPdfInputSchema,
   annotations: MUTATION_NON_IDEMPOTENT,
+  // The Intigriti OpenAPI spec advertises this endpoint as `application/json`
+  // returning a base64 string, but the server actually responds with raw
+  // `application/pdf` bytes (verified 2026-06-09). We therefore request a
+  // binary response and write the buffer verbatim.
   handler: async (input, client) => {
     const query: Record<string, string | undefined> = {};
     if (input.timeZone !== undefined) {
       query["timeZone"] = input.timeZone;
     }
-    const raw = await client.request<string>({
+    const bytes = await client.request<Buffer>({
       method: "POST",
       path: "/v2.1/submissions/{submissionCode}/pdf-exports",
       pathParams: { submissionCode: input.submissionCode },
       query,
+      responseType: "binary",
     });
-    const bytes = Buffer.from(raw, "base64");
     const mimeType = "application/pdf";
     if (input.outputPath) {
       await writeFile(input.outputPath, bytes);
       return { path: input.outputPath, bytes: bytes.length, mimeType };
     }
-    return { base64: raw, bytes: bytes.length, mimeType };
+    return { base64: bytes.toString("base64"), bytes: bytes.length, mimeType };
   },
 };
 
@@ -208,24 +212,26 @@ const submissionsExportCsv: ToolDef<SubmissionsExportCsvInput> = {
     "Export a submission as a CSV file. Returns base64-encoded content or writes to outputPath when provided.",
   inputSchema: SubmissionsExportCsvInputSchema,
   annotations: MUTATION_NON_IDEMPOTENT,
+  // Same caveat as the PDF export: the API returns raw bytes, not a
+  // base64-wrapped JSON string. Pull the response as binary.
   handler: async (input, client) => {
     const query: Record<string, string | undefined> = {};
     if (input.timeZone !== undefined) {
       query["timeZone"] = input.timeZone;
     }
-    const raw = await client.request<string>({
+    const bytes = await client.request<Buffer>({
       method: "POST",
       path: "/v2.1/submissions/{submissionCode}/csv-exports",
       pathParams: { submissionCode: input.submissionCode },
       query,
+      responseType: "binary",
     });
-    const bytes = Buffer.from(raw, "base64");
     const mimeType = "text/csv";
     if (input.outputPath) {
       await writeFile(input.outputPath, bytes);
       return { path: input.outputPath, bytes: bytes.length, mimeType };
     }
-    return { base64: raw, bytes: bytes.length, mimeType };
+    return { base64: bytes.toString("base64"), bytes: bytes.length, mimeType };
   },
 };
 

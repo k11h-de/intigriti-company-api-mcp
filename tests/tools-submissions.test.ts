@@ -618,41 +618,45 @@ describe("intigriti_submissions_export_pdf handler", () => {
     (t) => t.name === "intigriti_submissions_export_pdf",
   )!;
 
-  const fakeBase64 = Buffer.from("fake pdf content").toString("base64");
+  // Minimal valid-ish PDF payload — the handler treats the response as opaque
+  // bytes, so any Buffer is fine. Use the real magic so write-and-readback
+  // stays self-documenting.
+  const fakePdfBytes = Buffer.from("%PDF-1.4\n%fake\n%%EOF\n");
+  const expectedBase64 = fakePdfBytes.toString("base64");
 
   it("returns base64 and byte count in-memory when outputPath is not provided", async () => {
-    const { client } = makeStubClient(fakeBase64);
+    const { client } = makeStubClient(fakePdfBytes);
     const result = (await tool.handler(
       { submissionCode: "SUB-050" },
       client,
     )) as Record<string, unknown>;
 
-    expect(result["base64"]).toBe(fakeBase64);
-    expect(result["bytes"]).toBe(
-      Buffer.from(fakeBase64, "base64").length,
-    );
+    expect(result["base64"]).toBe(expectedBase64);
+    expect(result["bytes"]).toBe(fakePdfBytes.length);
     expect(result["mimeType"]).toBe("application/pdf");
   });
 
   it("writes file to disk and returns path when outputPath is provided", async () => {
     const outputPath = join(tmpdir(), `${randomUUID()}.pdf`);
-    const { client } = makeStubClient(fakeBase64);
+    const { client } = makeStubClient(fakePdfBytes);
     const result = (await tool.handler(
       { submissionCode: "SUB-050", outputPath },
       client,
     )) as Record<string, unknown>;
 
     expect(result["path"]).toBe(outputPath);
-    expect(result["bytes"]).toBe(Buffer.from(fakeBase64, "base64").length);
+    expect(result["bytes"]).toBe(fakePdfBytes.length);
     expect(result["mimeType"]).toBe("application/pdf");
 
-    // Verify the file was actually written
+    // Verify the file was written verbatim — no base64 round-trip, no
+    // UTF-8 decoding. The %PDF- magic must be intact.
     const written = await readFile(outputPath);
-    expect(written).toEqual(Buffer.from(fakeBase64, "base64"));
+    expect(written).toEqual(fakePdfBytes);
+    expect(written.subarray(0, 5).toString("latin1")).toBe("%PDF-");
   });
 
   it("passes timeZone as query parameter", async () => {
-    const { client, calls } = makeStubClient(fakeBase64);
+    const { client, calls } = makeStubClient(fakePdfBytes);
     await tool.handler(
       { submissionCode: "SUB-050", timeZone: "America/New_York" },
       client,
@@ -661,8 +665,8 @@ describe("intigriti_submissions_export_pdf handler", () => {
     expect(calls[0]?.args.query?.["timeZone"]).toBe("America/New_York");
   });
 
-  it("POSTs to correct path", async () => {
-    const { client, calls } = makeStubClient(fakeBase64);
+  it("POSTs to correct path with binary responseType", async () => {
+    const { client, calls } = makeStubClient(fakePdfBytes);
     await tool.handler({ submissionCode: "SUB-050" }, client);
 
     expect(calls[0]?.args.method).toBe("POST");
@@ -670,6 +674,7 @@ describe("intigriti_submissions_export_pdf handler", () => {
       "/v2.1/submissions/{submissionCode}/pdf-exports",
     );
     expect(calls[0]?.args.pathParams).toEqual({ submissionCode: "SUB-050" });
+    expect(calls[0]?.args.responseType).toBe("binary");
   });
 });
 
@@ -682,38 +687,39 @@ describe("intigriti_submissions_export_csv handler", () => {
     (t) => t.name === "intigriti_submissions_export_csv",
   )!;
 
-  const fakeBase64 = Buffer.from("col1,col2\nval1,val2").toString("base64");
+  const fakeCsvBytes = Buffer.from("col1,col2\nval1,val2\n");
+  const expectedBase64 = fakeCsvBytes.toString("base64");
 
   it("returns base64 and byte count in-memory when outputPath is not provided", async () => {
-    const { client } = makeStubClient(fakeBase64);
+    const { client } = makeStubClient(fakeCsvBytes);
     const result = (await tool.handler(
       { submissionCode: "SUB-060" },
       client,
     )) as Record<string, unknown>;
 
-    expect(result["base64"]).toBe(fakeBase64);
-    expect(result["bytes"]).toBe(Buffer.from(fakeBase64, "base64").length);
+    expect(result["base64"]).toBe(expectedBase64);
+    expect(result["bytes"]).toBe(fakeCsvBytes.length);
     expect(result["mimeType"]).toBe("text/csv");
   });
 
   it("writes file to disk and returns path when outputPath is provided", async () => {
     const outputPath = join(tmpdir(), `${randomUUID()}.csv`);
-    const { client } = makeStubClient(fakeBase64);
+    const { client } = makeStubClient(fakeCsvBytes);
     const result = (await tool.handler(
       { submissionCode: "SUB-060", outputPath },
       client,
     )) as Record<string, unknown>;
 
     expect(result["path"]).toBe(outputPath);
-    expect(result["bytes"]).toBe(Buffer.from(fakeBase64, "base64").length);
+    expect(result["bytes"]).toBe(fakeCsvBytes.length);
     expect(result["mimeType"]).toBe("text/csv");
 
     const written = await readFile(outputPath);
-    expect(written).toEqual(Buffer.from(fakeBase64, "base64"));
+    expect(written).toEqual(fakeCsvBytes);
   });
 
   it("passes timeZone as query parameter", async () => {
-    const { client, calls } = makeStubClient(fakeBase64);
+    const { client, calls } = makeStubClient(fakeCsvBytes);
     await tool.handler(
       { submissionCode: "SUB-060", timeZone: "America/New_York" },
       client,
@@ -722,14 +728,15 @@ describe("intigriti_submissions_export_csv handler", () => {
     expect(calls[0]?.args.query?.["timeZone"]).toBe("America/New_York");
   });
 
-  it("POSTs to correct path with mimeType text/csv", async () => {
-    const { client, calls } = makeStubClient(fakeBase64);
+  it("POSTs to correct path with binary responseType", async () => {
+    const { client, calls } = makeStubClient(fakeCsvBytes);
     await tool.handler({ submissionCode: "SUB-060" }, client);
 
     expect(calls[0]?.args.method).toBe("POST");
     expect(calls[0]?.args.path).toBe(
       "/v2.1/submissions/{submissionCode}/csv-exports",
     );
+    expect(calls[0]?.args.responseType).toBe("binary");
   });
 });
 

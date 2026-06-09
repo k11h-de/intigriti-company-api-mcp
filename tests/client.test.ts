@@ -30,7 +30,7 @@ function envTokenSource(token = "env-token"): TokenSource {
 type FetchCall = { url: string; init: RequestInit };
 
 /** Builds a fetch stub that records calls and returns the given responses in order. */
-function makeFetch(responses: Array<{ status: number; body?: unknown; contentType?: string }>) {
+function makeFetch(responses: Array<{ status: number; body?: unknown; contentType?: string; bodyBytes?: Buffer }>) {
   const calls: FetchCall[] = [];
 
   const fetchImpl = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
@@ -40,10 +40,25 @@ function makeFetch(responses: Array<{ status: number; body?: unknown; contentTyp
     const resp = responses[calls.length - 1] ?? responses[responses.length - 1];
     if (!resp) throw new Error("makeFetch: no more responses configured");
 
+    const headers = new Headers();
+    if (resp.bodyBytes !== undefined) {
+      // Raw-bytes response (e.g. application/pdf).
+      headers.set("content-type", resp.contentType ?? "application/octet-stream");
+      const bytes = resp.bodyBytes;
+      return {
+        ok: resp.status >= 200 && resp.status < 300,
+        status: resp.status,
+        headers,
+        json: async () => undefined,
+        text: async () => bytes.toString("utf8"),
+        arrayBuffer: async () =>
+          bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+      } as unknown as Response;
+    }
+
     const isJson = resp.contentType === undefined || resp.contentType.includes("application/json");
     const bodyText =
       resp.body === undefined || resp.body === null ? "" : JSON.stringify(resp.body);
-    const headers = new Headers();
     if (resp.body !== undefined && resp.body !== null) {
       headers.set("content-type", resp.contentType ?? "application/json");
     }
@@ -54,6 +69,7 @@ function makeFetch(responses: Array<{ status: number; body?: unknown; contentTyp
       headers,
       json: async () => (isJson ? resp.body : undefined),
       text: async () => bodyText,
+      arrayBuffer: async () => Buffer.from(bodyText, "utf8").buffer,
     } as unknown as Response;
   };
 
@@ -61,7 +77,7 @@ function makeFetch(responses: Array<{ status: number; body?: unknown; contentTyp
 }
 
 function makeOpts(
-  overrides: Partial<ClientOptions> & { fetchImpl?: typeof fetch; responses?: Array<{ status: number; body?: unknown; contentType?: string }> } = {}
+  overrides: Partial<ClientOptions> & { fetchImpl?: typeof fetch; responses?: Array<{ status: number; body?: unknown; contentType?: string; bodyBytes?: Buffer }> } = {}
 ): ClientOptions & { fetchImpl: typeof fetch } {
   const { responses, ...rest } = overrides;
   const fetch = rest.fetchImpl ?? makeFetch(responses ?? [{ status: 200, body: { ok: true } }]).fetchImpl;
@@ -307,6 +323,77 @@ describe("Response handling", () => {
     expect(caught?.method).toBe("POST");
     expect(caught?.url).toContain("/v2.1/items");
     expect(caught?.body).toBe("Validation error");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Binary responseType
+// ---------------------------------------------------------------------------
+
+describe("Binary responseType", () => {
+  // Bytes that aren't valid UTF-8 — would be replaced by U+FFFD if we
+  // ever went through resp.text(). The test asserts they survive verbatim.
+  const pdfBytes = Buffer.concat([
+    Buffer.from("%PDF-1.4\n", "ascii"),
+    Buffer.from([0xff, 0xfe, 0xfd, 0x00, 0x80, 0x81, 0x82]),
+    Buffer.from("\n%%EOF\n", "ascii"),
+  ]);
+
+  it("returns the response as a Buffer when responseType is 'binary'", async () => {
+    const { fetchImpl } = makeFetch([
+      { status: 200, contentType: "application/pdf", bodyBytes: pdfBytes },
+    ]);
+    const client = createClient(makeOpts({ fetchImpl: fetchImpl as typeof fetch }));
+
+    const result = await client.request<Buffer>({
+      method: "POST",
+      path: "/v2.1/exports/pdf",
+      responseType: "binary",
+    });
+
+    expect(Buffer.isBuffer(result)).toBe(true);
+    expect(result).toEqual(pdfBytes);
+    // Magic bytes intact — not corrupted by UTF-8 round-trip.
+    expect(result.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+  });
+
+  it("preserves arbitrary binary bytes (no UTF-8 corruption)", async () => {
+    const allBytes = Buffer.from(Array.from({ length: 256 }, (_, i) => i));
+    const { fetchImpl } = makeFetch([
+      { status: 200, contentType: "application/octet-stream", bodyBytes: allBytes },
+    ]);
+    const client = createClient(makeOpts({ fetchImpl: fetchImpl as typeof fetch }));
+
+    const result = await client.request<Buffer>({
+      method: "GET",
+      path: "/v2.1/blob",
+      responseType: "binary",
+    });
+
+    expect(result).toEqual(allBytes);
+    expect(result.length).toBe(256);
+  });
+
+  it("falls back to text/JSON parsing on a non-2xx response so errors stay readable", async () => {
+    const { fetchImpl } = makeFetch([
+      { status: 403, body: { message: "Forbidden" } },
+    ]);
+    const client = createClient(makeOpts({ fetchImpl: fetchImpl as typeof fetch, retryDelayMs: 0 }));
+
+    let caught: IntigritiApiError | undefined;
+    try {
+      await client.request({
+        method: "POST",
+        path: "/v2.1/exports/pdf",
+        responseType: "binary",
+      });
+    } catch (e) {
+      caught = e as IntigritiApiError;
+    }
+
+    expect(caught).toBeInstanceOf(IntigritiApiError);
+    expect(caught?.status).toBe(403);
+    expect(caught?.body).toEqual({ message: "Forbidden" });
   });
 });
 

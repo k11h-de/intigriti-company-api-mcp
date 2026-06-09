@@ -28,6 +28,15 @@ export interface RequestArgs {
     filename?: string;
     contentType?: string;
   };
+  /**
+   * How to decode the response body.
+   *   - "auto" (default): JSON if content-type says so, otherwise text.
+   *   - "binary": return a Buffer of the raw bytes; required for endpoints
+   *     that send `application/pdf`, `text/csv`, etc., regardless of what
+   *     the OpenAPI spec advertises (some Intigriti export endpoints declare
+   *     `application/json` but actually return raw binary).
+   */
+  responseType?: "auto" | "binary";
 }
 
 export interface IntigritiClient {
@@ -79,10 +88,22 @@ function defaultSleep(ms: number): Promise<void> {
 // Response reading
 // ---------------------------------------------------------------------------
 
-async function readResponseBody(resp: Response): Promise<unknown> {
-  const ct = resp.headers.get("content-type") ?? "";
+async function readResponseBody(
+  resp: Response,
+  responseType: "auto" | "binary" = "auto"
+): Promise<unknown> {
   if (resp.status === 204) return null;
 
+  // Only honour "binary" on a successful response. Errors are virtually
+  // always JSON or text and need to be readable in IntigritiApiError.
+  if (responseType === "binary" && resp.ok) {
+    // Read as raw bytes — never go through resp.text(), which would
+    // UTF-8-decode arbitrary binary and replace invalid bytes with U+FFFD.
+    const buf = Buffer.from(await resp.arrayBuffer());
+    return buf.length > 0 ? buf : null;
+  }
+
+  const ct = resp.headers.get("content-type") ?? "";
   const text = await resp.text();
   if (!text) return null;
 
@@ -177,7 +198,7 @@ export function createClient(opts: ClientOptions): IntigritiClient {
       resp = await attemptWithRetry(token);
     }
 
-    const body = await readResponseBody(resp);
+    const body = await readResponseBody(resp, args.responseType);
     return { resp, body };
   }
 
