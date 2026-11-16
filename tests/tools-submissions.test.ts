@@ -676,6 +676,47 @@ describe("intigriti_submissions_export_pdf handler", () => {
     expect(calls[0]?.args.pathParams).toEqual({ submissionCode: "SUB-050" });
     expect(calls[0]?.args.responseType).toBe("binary");
   });
+
+  it("strips the protobuf length-delimited wrapper the API puts around the PDF", async () => {
+    // 0x0a = field 1, wire type 2; then a varint with the PDF length.
+    const wrapped = Buffer.concat([
+      Buffer.from([0x0a, fakePdfBytes.length]),
+      fakePdfBytes,
+    ]);
+    const { client } = makeStubClient(wrapped);
+    const result = (await tool.handler(
+      { submissionCode: "SUB-050" },
+      client,
+    )) as Record<string, unknown>;
+
+    expect(result["base64"]).toBe(expectedBase64);
+    expect(result["bytes"]).toBe(fakePdfBytes.length);
+  });
+
+  it("strips a multi-byte varint wrapper (real-world size)", async () => {
+    // 1,879,290 bytes encodes as varint fa d9 72 — the prefix observed live.
+    const big = Buffer.alloc(1_879_290, 0x20);
+    fakePdfBytes.copy(big);
+    const wrapped = Buffer.concat([Buffer.from([0x0a, 0xfa, 0xd9, 0x72]), big]);
+    const outputPath = join(tmpdir(), `${randomUUID()}.pdf`);
+    const { client } = makeStubClient(wrapped);
+    await tool.handler({ submissionCode: "SUB-050", outputPath }, client);
+
+    const written = await readFile(outputPath);
+    expect(written.length).toBe(1_879_290);
+    expect(written.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+  });
+
+  it("leaves a payload alone when the length prefix does not match", async () => {
+    const notWrapped = Buffer.concat([Buffer.from([0x0a, 0x05]), fakePdfBytes]);
+    const { client } = makeStubClient(notWrapped);
+    const result = (await tool.handler(
+      { submissionCode: "SUB-050" },
+      client,
+    )) as Record<string, unknown>;
+
+    expect(result["bytes"]).toBe(notWrapped.length);
+  });
 });
 
 // ---------------------------------------------------------------------------

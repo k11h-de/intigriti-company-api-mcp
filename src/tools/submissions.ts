@@ -6,7 +6,7 @@ import {
   MUTATION_IDEMPOTENT,
   DESTRUCTIVE_IDEMPOTENT,
 } from "./types.js";
-import { isoToUnixSeconds } from "./utils.js";
+import { isoToUnixSeconds, unwrapProtobufBytesField } from "./utils.js";
 import {
   SubmissionsListInputSchema,
   SubmissionsGetInputSchema,
@@ -184,19 +184,22 @@ const submissionsExportPdf: ToolDef<SubmissionsExportPdfInput> = {
   // The Intigriti OpenAPI spec advertises this endpoint as `application/json`
   // returning a base64 string, but the server actually responds with raw
   // `application/pdf` bytes (verified 2026-06-09). We therefore request a
-  // binary response and write the buffer verbatim.
+  // binary response. Those bytes are additionally wrapped in a protobuf
+  // length-delimited field (verified 2026-11-16), which we strip so the
+  // result starts with `%PDF-`.
   handler: async (input, client) => {
     const query: Record<string, string | undefined> = {};
     if (input.timeZone !== undefined) {
       query["timeZone"] = input.timeZone;
     }
-    const bytes = await client.request<Buffer>({
+    const raw = await client.request<Buffer>({
       method: "POST",
       path: "/v2.1/submissions/{submissionCode}/pdf-exports",
       pathParams: { submissionCode: input.submissionCode },
       query,
       responseType: "binary",
     });
+    const bytes = unwrapProtobufBytesField(raw);
     const mimeType = "application/pdf";
     if (input.outputPath) {
       await writeFile(input.outputPath, bytes);
