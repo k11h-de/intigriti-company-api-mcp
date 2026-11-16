@@ -11,6 +11,8 @@ import {
   SubmissionsListInputSchema,
   SubmissionsGetInputSchema,
   SubmissionsGetEventsInputSchema,
+  SubmissionsGetRetestInputSchema,
+  SubmissionsListRetestsInputSchema,
   SubmissionsAddCompanyBonusInputSchema,
   SubmissionsSetCustomBountyInputSchema,
   SubmissionsUpdateGroupInputSchema,
@@ -56,8 +58,8 @@ function makeStubClient(
 // ---------------------------------------------------------------------------
 
 describe("submissionsTools exports", () => {
-  it("has 24 tools", () => {
-    expect(submissionsTools).toHaveLength(24);
+  it("has 26 tools", () => {
+    expect(submissionsTools).toHaveLength(26);
   });
 
   it("has all tool names in order", () => {
@@ -69,6 +71,8 @@ describe("submissionsTools exports", () => {
       "intigriti_submissions_get_payouts",
       "intigriti_submissions_get_integrations",
       "intigriti_submissions_get_possible_groups",
+      "intigriti_submissions_list_retests",
+      "intigriti_submissions_get_retest",
       "intigriti_submissions_add_company_bonus",
       "intigriti_submissions_export_pdf",
       "intigriti_submissions_export_csv",
@@ -103,8 +107,10 @@ describe("annotations: GET tools use READ_ONLY_ANNOTATIONS", () => {
     "intigriti_submissions_get_payouts",
     "intigriti_submissions_get_integrations",
     "intigriti_submissions_get_possible_groups",
+    "intigriti_submissions_list_retests",
+    "intigriti_submissions_get_retest",
   ];
-  it("all six read-only tools have READ_ONLY_ANNOTATIONS", () => {
+  it("all eight read-only tools have READ_ONLY_ANNOTATIONS", () => {
     for (const name of readOnlyNames) {
       const tool = submissionsTools.find((t) => t.name === name)!;
       expect(tool.annotations).toEqual(READ_ONLY_ANNOTATIONS);
@@ -242,6 +248,68 @@ describe("intigriti_submissions_get_events handler", () => {
     await tool.handler({ submissionCode: "SUB-002" }, client);
 
     expect(calls[0]?.args.query).not.toHaveProperty("CreatedSince");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET retests
+// ---------------------------------------------------------------------------
+
+describe("retest tools", () => {
+  const RID = "3f2b8c1e-5d4a-4e6b-9a7c-1b2d3e4f5a6b";
+  const list = submissionsTools.find(
+    (t) => t.name === "intigriti_submissions_list_retests",
+  )!;
+  const get = submissionsTools.find(
+    (t) => t.name === "intigriti_submissions_get_retest",
+  )!;
+
+  it("list_retests GETs /retests with submissionCode pathParam", async () => {
+    const { client, calls } = makeStubClient();
+    await list.handler({ submissionCode: "SUB-020" }, client);
+    expect(calls[0]?.args.method).toBe("GET");
+    expect(calls[0]?.args.path).toBe("/v2.1/submissions/{submissionCode}/retests");
+    expect(calls[0]?.args.pathParams).toEqual({ submissionCode: "SUB-020" });
+  });
+
+  it("get_retest GETs /retests/{retestId} with both pathParams", async () => {
+    const { client, calls } = makeStubClient();
+    await get.handler({ submissionCode: "SUB-020", retestId: RID }, client);
+    expect(calls[0]?.args.method).toBe("GET");
+    expect(calls[0]?.args.path).toBe(
+      "/v2.1/submissions/{submissionCode}/retests/{retestId}",
+    );
+    expect(calls[0]?.args.pathParams).toEqual({
+      submissionCode: "SUB-020",
+      retestId: RID,
+    });
+  });
+
+  it("returns the client response unchanged", async () => {
+    const payload = [{ id: RID, report: null }];
+    const { client } = makeStubClient(payload);
+    expect(await list.handler({ submissionCode: "SUB-020" }, client)).toBe(payload);
+  });
+
+  it("schemas require submissionCode and a GUID retestId, and are strict", () => {
+    expect(SubmissionsListRetestsInputSchema.safeParse({}).success).toBe(false);
+    expect(
+      SubmissionsListRetestsInputSchema.safeParse({ submissionCode: "S", x: 1 }).success,
+    ).toBe(false);
+    expect(
+      SubmissionsGetRetestInputSchema.safeParse({ submissionCode: "S", retestId: "nope" }).success,
+    ).toBe(false);
+    expect(
+      SubmissionsGetRetestInputSchema.safeParse({ submissionCode: "S", retestId: RID }).success,
+    ).toBe(true);
+  });
+
+  it("descriptions state no request endpoint and report-only-when-completed", () => {
+    for (const tool of [list, get]) {
+      expect(tool.description).toMatch(/NO endpoint to request a retest/);
+      expect(tool.description).toMatch(/web UI/);
+      expect(tool.description).toMatch(/completed or accepted/);
+    }
   });
 });
 

@@ -104,11 +104,11 @@ Add one of the following blocks to `claude_desktop_config.json`. See Claude Desk
 
 ## Tools
 
-50 tools across 9 tags. Tool names follow the convention `intigriti_<tag>_<action>`.
+52 tools across 9 tags. Tool names follow the convention `intigriti_<tag>_<action>`.
 
 | Tag | Count | Coverage |
 |-----|-------|----------|
-| Submissions | 24 | list, get, create, update state/severity/tags, messages, attachments, exports (PDF, CSV) |
+| Submissions | 26 | list, get, create, update state/severity/tags, retests (read-only: list, get), messages, attachments, exports (PDF, CSV) |
 | Programs | 6 | list, get, list submissions/researchers/payouts, import submission (BETA — creates a real submission) |
 | ProgramUpdates | 6 | list (all + per-program), create, update, delete, publish |
 | RewardSystem | 5 | reward request CRUD, payout creation, budget |
@@ -119,6 +119,10 @@ Add one of the following blocks to `claude_desktop_config.json`. See Claude Desk
 | SubmissionTypes | 1 | — |
 
 ## Special-case behavior
+
+**Retests (read-only)**
+
+`intigriti_submissions_list_retests` and `intigriti_submissions_get_retest` only read retests. The Company API v2.1 has no endpoint to request one — do that in the Intigriti web UI. The `report` part is only filled once a retest is completed or accepted.
 
 **Binary exports (PDF, CSV)**
 

@@ -70,6 +70,30 @@ export type SubmissionsGetPossibleGroupsInput = z.infer<
   typeof SubmissionsGetPossibleGroupsInputSchema
 >;
 
+export const SubmissionsListRetestsInputSchema = z.object({
+  submissionCode: z
+    .string()
+    .min(1)
+    .describe("Unique code identifying the submission"),
+}).strict();
+export type SubmissionsListRetestsInput = z.infer<
+  typeof SubmissionsListRetestsInputSchema
+>;
+
+export const SubmissionsGetRetestInputSchema = z.object({
+  submissionCode: z
+    .string()
+    .min(1)
+    .describe("Unique code identifying the submission"),
+  retestId: z
+    .string()
+    .uuid()
+    .describe("GUID of the retest (the `id` from list_retests)"),
+}).strict();
+export type SubmissionsGetRetestInput = z.infer<
+  typeof SubmissionsGetRetestInputSchema
+>;
+
 // ---------------------------------------------------------------------------
 // Mutations — POSTs
 // ---------------------------------------------------------------------------

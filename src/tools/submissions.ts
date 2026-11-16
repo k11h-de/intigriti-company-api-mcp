@@ -14,6 +14,8 @@ import {
   SubmissionsGetPayoutsInputSchema,
   SubmissionsGetIntegrationsInputSchema,
   SubmissionsGetPossibleGroupsInputSchema,
+  SubmissionsListRetestsInputSchema,
+  SubmissionsGetRetestInputSchema,
   SubmissionsAddCompanyBonusInputSchema,
   SubmissionsExportPdfInputSchema,
   SubmissionsExportCsvInputSchema,
@@ -38,6 +40,8 @@ import {
   type SubmissionsGetPayoutsInput,
   type SubmissionsGetIntegrationsInput,
   type SubmissionsGetPossibleGroupsInput,
+  type SubmissionsListRetestsInput,
+  type SubmissionsGetRetestInput,
   type SubmissionsAddCompanyBonusInput,
   type SubmissionsExportPdfInput,
   type SubmissionsExportCsvInput,
@@ -154,6 +158,41 @@ const submissionsGetPossibleGroups: ToolDef<SubmissionsGetPossibleGroupsInput> =
         pathParams: { submissionCode: input.submissionCode },
       }),
   };
+
+const submissionsListRetests: ToolDef<SubmissionsListRetestsInput> = {
+  name: "intigriti_submissions_list_retests",
+  description:
+    "List the active and completed retests of a submission (status, deadline, requestedAt/completedAt/acceptedAt, retester), ordered by request date. " +
+    "The Company API v2.1 has NO endpoint to request a retest — a retest has to be requested in the Intigriti web UI; this tool is read-only. " +
+    "The `report` part (result, additionalRemarks, attachments) is only filled once the retest is completed or accepted; until then it is null. Attachment urls are signed download links.",
+  inputSchema: SubmissionsListRetestsInputSchema,
+  annotations: READ_ONLY_ANNOTATIONS,
+  handler: (input, client) =>
+    client.request({
+      method: "GET",
+      path: "/v2.1/submissions/{submissionCode}/retests",
+      pathParams: { submissionCode: input.submissionCode },
+    }),
+};
+
+const submissionsGetRetest: ToolDef<SubmissionsGetRetestInput> = {
+  name: "intigriti_submissions_get_retest",
+  description:
+    "Retrieve a single retest of a submission by its retestId (from list_retests), including status and completion dates. " +
+    "The Company API v2.1 has NO endpoint to request a retest — a retest has to be requested in the Intigriti web UI; this tool is read-only. " +
+    "The `report` part (result, additionalRemarks, attachments) is only filled once the retest is completed or accepted; until then it is null. Attachment urls are signed download links.",
+  inputSchema: SubmissionsGetRetestInputSchema,
+  annotations: READ_ONLY_ANNOTATIONS,
+  handler: (input, client) =>
+    client.request({
+      method: "GET",
+      path: "/v2.1/submissions/{submissionCode}/retests/{retestId}",
+      pathParams: {
+        submissionCode: input.submissionCode,
+        retestId: input.retestId,
+      },
+    }),
+};
 
 // ---------------------------------------------------------------------------
 // Mutations — POSTs
@@ -531,6 +570,8 @@ export const submissionsTools: AnyToolDef[] = [
   submissionsGetPayouts,
   submissionsGetIntegrations,
   submissionsGetPossibleGroups,
+  submissionsListRetests,
+  submissionsGetRetest,
   submissionsAddCompanyBonus,
   submissionsExportPdf,
   submissionsExportCsv,
