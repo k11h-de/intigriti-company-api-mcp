@@ -94,6 +94,95 @@ export type SubmissionsGetRetestInput = z.infer<
   typeof SubmissionsGetRetestInputSchema
 >;
 
+export const SubmissionsListAssigneesInputSchema = z.object({
+  submissionCode: z
+    .string()
+    .min(1)
+    .describe("Unique code identifying the submission"),
+}).strict();
+export type SubmissionsListAssigneesInput = z.infer<
+  typeof SubmissionsListAssigneesInputSchema
+>;
+
+export type SubmissionsSearchFilter = {
+  name?: string | null;
+  value?: unknown;
+  operator?: number | null;
+  logic?: number | null;
+  filters?: SubmissionsSearchFilter[] | null;
+};
+
+const SubmissionsSearchFilterSchema: z.ZodType<SubmissionsSearchFilter> = z.lazy(
+  () =>
+    z
+      .object({
+        name: z.string().nullable().optional().describe("Field name to filter on"),
+        value: z.unknown().optional().describe("Value to compare against"),
+        operator: z
+          .number()
+          .int()
+          .min(1)
+          .max(8)
+          .nullable()
+          .optional()
+          .describe(
+            "1=Equal, 2=NotEqual, 3=GreaterThan, 4=GreaterThanOrEqual, 5=LessThan, 6=LessThanOrEqual, 7=Contains, 8=NotContains",
+          ),
+        logic: z
+          .number()
+          .int()
+          .min(1)
+          .max(3)
+          .nullable()
+          .optional()
+          .describe("Combines nested filters: 1=Or, 2=And, 3=Any"),
+        filters: z
+          .array(SubmissionsSearchFilterSchema)
+          .nullable()
+          .optional()
+          .describe("Nested filters combined with `logic`"),
+      })
+      .strict(),
+);
+
+export const SubmissionsSearchInputSchema = z.object({
+  page: z.number().int().min(0).optional().describe("Page number"),
+  pageSize: z.number().int().min(1).optional().describe("Results per page"),
+  filters: z
+    .array(SubmissionsSearchFilterSchema)
+    .nullable()
+    .optional()
+    .describe("Filters, same field names as the Intigriti platform"),
+  sorts: z
+    .array(
+      z.object({
+        name: z.string().min(1).describe("Field name to sort by"),
+        direction: z
+          .number()
+          .int()
+          .min(1)
+          .max(2)
+          .optional()
+          .describe("1=Ascending, 2=Descending"),
+      }).strict(),
+    )
+    .nullable()
+    .optional()
+    .describe("Sort order"),
+  search: z
+    .object({
+      value: z.string().describe("Free-text search term"),
+      properties: z
+        .array(z.string())
+        .describe("Field names the search term is matched against"),
+    })
+    .strict()
+    .nullable()
+    .optional()
+    .describe("Free-text search"),
+}).strict();
+export type SubmissionsSearchInput = z.infer<typeof SubmissionsSearchInputSchema>;
+
 // ---------------------------------------------------------------------------
 // Mutations — POSTs
 // ---------------------------------------------------------------------------
@@ -421,6 +510,32 @@ export const SubmissionsUpdateAssetInputSchema = z.object({
 }).strict();
 export type SubmissionsUpdateAssetInput = z.infer<
   typeof SubmissionsUpdateAssetInputSchema
+>;
+
+export const SubmissionsAssignInputSchema = z.object({
+  submissionCode: z
+    .string()
+    .min(1)
+    .describe("Unique code identifying the submission"),
+  userId: z
+    .string()
+    .uuid()
+    .describe("GUID of an eligible company user (from list_assignees)"),
+}).strict();
+export type SubmissionsAssignInput = z.infer<typeof SubmissionsAssignInputSchema>;
+
+export const SubmissionsSetCustomFieldValueInputSchema = z.object({
+  submissionCode: z
+    .string()
+    .min(1)
+    .describe("Unique code identifying the submission"),
+  id: z.string().uuid().describe("GUID of the custom field"),
+  value: z
+    .unknown()
+    .describe("New value for the custom field; null clears it"),
+}).strict();
+export type SubmissionsSetCustomFieldValueInput = z.infer<
+  typeof SubmissionsSetCustomFieldValueInputSchema
 >;
 
 // ---------------------------------------------------------------------------

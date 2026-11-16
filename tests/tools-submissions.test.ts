@@ -13,6 +13,9 @@ import {
   SubmissionsGetEventsInputSchema,
   SubmissionsGetRetestInputSchema,
   SubmissionsListRetestsInputSchema,
+  SubmissionsSearchInputSchema,
+  SubmissionsAssignInputSchema,
+  SubmissionsSetCustomFieldValueInputSchema,
   SubmissionsAddCompanyBonusInputSchema,
   SubmissionsSetCustomBountyInputSchema,
   SubmissionsUpdateGroupInputSchema,
@@ -58,8 +61,8 @@ function makeStubClient(
 // ---------------------------------------------------------------------------
 
 describe("submissionsTools exports", () => {
-  it("has 26 tools", () => {
-    expect(submissionsTools).toHaveLength(26);
+  it("has 30 tools", () => {
+    expect(submissionsTools).toHaveLength(30);
   });
 
   it("has all tool names in order", () => {
@@ -73,6 +76,8 @@ describe("submissionsTools exports", () => {
       "intigriti_submissions_get_possible_groups",
       "intigriti_submissions_list_retests",
       "intigriti_submissions_get_retest",
+      "intigriti_submissions_list_assignees",
+      "intigriti_submissions_search",
       "intigriti_submissions_add_company_bonus",
       "intigriti_submissions_export_pdf",
       "intigriti_submissions_export_csv",
@@ -89,6 +94,8 @@ describe("submissionsTools exports", () => {
       "intigriti_submissions_update_awaiting_feedback",
       "intigriti_submissions_update_group",
       "intigriti_submissions_update_asset",
+      "intigriti_submissions_assign",
+      "intigriti_submissions_set_custom_field_value",
       "intigriti_submissions_delete_company_bonus",
       "intigriti_submissions_remove_tag",
     ]);
@@ -109,8 +116,10 @@ describe("annotations: GET tools use READ_ONLY_ANNOTATIONS", () => {
     "intigriti_submissions_get_possible_groups",
     "intigriti_submissions_list_retests",
     "intigriti_submissions_get_retest",
+    "intigriti_submissions_list_assignees",
+    "intigriti_submissions_search",
   ];
-  it("all eight read-only tools have READ_ONLY_ANNOTATIONS", () => {
+  it("all ten read-only tools have READ_ONLY_ANNOTATIONS", () => {
     for (const name of readOnlyNames) {
       const tool = submissionsTools.find((t) => t.name === name)!;
       expect(tool.annotations).toEqual(READ_ONLY_ANNOTATIONS);
@@ -147,8 +156,10 @@ describe("annotations: PUT tools use MUTATION_IDEMPOTENT", () => {
     "intigriti_submissions_update_awaiting_feedback",
     "intigriti_submissions_update_group",
     "intigriti_submissions_update_asset",
+    "intigriti_submissions_assign",
+    "intigriti_submissions_set_custom_field_value",
   ];
-  it("all eight PUT tools have MUTATION_IDEMPOTENT", () => {
+  it("all ten PUT tools have MUTATION_IDEMPOTENT", () => {
     for (const name of putNames) {
       const tool = submissionsTools.find((t) => t.name === name)!;
       expect(tool.annotations).toEqual(MUTATION_IDEMPOTENT);
@@ -310,6 +321,78 @@ describe("retest tools", () => {
       expect(tool.description).toMatch(/web UI/);
       expect(tool.description).toMatch(/completed or accepted/);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// assignees / search / custom-field-value
+// ---------------------------------------------------------------------------
+
+describe("assignee, search and custom-field tools", () => {
+  const UID = "3f2b8c1e-5d4a-4e6b-9a7c-1b2d3e4f5a6b";
+  const find = (n: string) =>
+    submissionsTools.find((t) => t.name === `intigriti_submissions_${n}`)!;
+
+  it("list_assignees GETs /assignees", async () => {
+    const { client, calls } = makeStubClient();
+    await find("list_assignees").handler({ submissionCode: "SUB-1" }, client);
+    expect(calls[0]?.args.method).toBe("GET");
+    expect(calls[0]?.args.path).toBe("/v2.1/submissions/{submissionCode}/assignees");
+    expect(calls[0]?.args.pathParams).toEqual({ submissionCode: "SUB-1" });
+  });
+
+  it("search POSTs the query as body", async () => {
+    const { client, calls } = makeStubClient();
+    const input = {
+      page: 0,
+      pageSize: 50,
+      filters: [{ name: "status", operator: 1, value: 3 }],
+      sorts: [{ name: "lastUpdatedAt", direction: 2 }],
+    };
+    await find("search").handler(input, client);
+    expect(calls[0]?.args.method).toBe("POST");
+    expect(calls[0]?.args.path).toBe("/v2.1/submissions/search");
+    expect(calls[0]?.args.body).toEqual(input);
+  });
+
+  it("search accepts empty input and nested filters, rejects bad operator", () => {
+    expect(SubmissionsSearchInputSchema.safeParse({}).success).toBe(true);
+    expect(
+      SubmissionsSearchInputSchema.safeParse({
+        filters: [{ logic: 1, filters: [{ name: "a", operator: 7, value: "x" }] }],
+      }).success,
+    ).toBe(true);
+    expect(
+      SubmissionsSearchInputSchema.safeParse({ filters: [{ operator: 99 }] }).success,
+    ).toBe(false);
+  });
+
+  it("assign PUTs /assignee with userId body", async () => {
+    const { client, calls } = makeStubClient();
+    await find("assign").handler({ submissionCode: "SUB-1", userId: UID }, client);
+    expect(calls[0]?.args.method).toBe("PUT");
+    expect(calls[0]?.args.path).toBe("/v2.1/submissions/{submissionCode}/assignee");
+    expect(calls[0]?.args.pathParams).toEqual({ submissionCode: "SUB-1" });
+    expect(calls[0]?.args.body).toEqual({ userId: UID });
+    expect(
+      SubmissionsAssignInputSchema.safeParse({ submissionCode: "S", userId: "x" }).success,
+    ).toBe(false);
+  });
+
+  it("set_custom_field_value PUTs id/value and sends null when value omitted", async () => {
+    const { client, calls } = makeStubClient();
+    const tool = find("set_custom_field_value");
+    await tool.handler({ submissionCode: "SUB-1", id: UID, value: "abc" }, client);
+    await tool.handler({ submissionCode: "SUB-1", id: UID }, client);
+    expect(calls[0]?.args.method).toBe("PUT");
+    expect(calls[0]?.args.path).toBe(
+      "/v2.1/submissions/{submissionCode}/custom-field-value",
+    );
+    expect(calls[0]?.args.body).toEqual({ id: UID, value: "abc" });
+    expect(calls[1]?.args.body).toEqual({ id: UID, value: null });
+    expect(
+      SubmissionsSetCustomFieldValueInputSchema.safeParse({ submissionCode: "S", id: "no" }).success,
+    ).toBe(false);
   });
 });
 

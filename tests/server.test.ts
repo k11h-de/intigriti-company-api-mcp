@@ -20,8 +20,8 @@ function makeClient(impl?: Partial<IntigritiClient>): IntigritiClient {
 // ---------------------------------------------------------------------------
 
 describe("ALL_TOOLS", () => {
-  it("registers exactly 52 tools", () => {
-    expect(ALL_TOOLS).toHaveLength(52);
+  it("registers exactly 57 tools", () => {
+    expect(ALL_TOOLS).toHaveLength(57);
   });
 
   it("has no duplicate names", () => {
@@ -217,13 +217,13 @@ describe("wrapHandler — generic Error", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildServer", () => {
-  it("creates a server with 52 registered tools", () => {
+  it("creates a server with 57 registered tools", () => {
     const client = makeClient();
     const server = buildServer(client);
 
     // The SDK stores tools in _registeredTools as a plain object (not a Map).
     const internalTools = (server as any)._registeredTools as Record<string, unknown>;
-    expect(Object.keys(internalTools)).toHaveLength(52);
+    expect(Object.keys(internalTools)).toHaveLength(57);
   });
 });
 

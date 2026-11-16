@@ -47,14 +47,29 @@ function makeStubClient(): { client: IntigritiClient; calls: CapturedCall[] } {
 // ---------------------------------------------------------------------------
 
 describe("programsTools exports", () => {
-  it("has 6 tools with correct names", () => {
-    expect(programsTools).toHaveLength(6);
+  it("has 7 tools with correct names", () => {
+    expect(programsTools).toHaveLength(7);
     expect(programsTools[0]?.name).toBe("intigriti_programs_list");
     expect(programsTools[1]?.name).toBe("intigriti_programs_get");
     expect(programsTools[2]?.name).toBe("intigriti_programs_list_submissions");
     expect(programsTools[3]?.name).toBe("intigriti_programs_list_researchers");
     expect(programsTools[4]?.name).toBe("intigriti_programs_list_payouts");
     expect(programsTools[5]?.name).toBe("intigriti_programs_import_submission");
+    expect(programsTools[6]?.name).toBe("intigriti_programs_get_custom_fields");
+  });
+});
+
+describe("programs_get_custom_fields handler", () => {
+  it("GETs /custom-fields with programId pathParam", async () => {
+    const tool = programsTools.find(
+      (t) => t.name === "intigriti_programs_get_custom_fields",
+    )!;
+    const calls: any[] = [];
+    const client = { request: async (a: unknown) => (calls.push(a), {}) } as never;
+    await tool.handler({ programId: "3f2b8c1e-5d4a-4e6b-9a7c-1b2d3e4f5a6b" }, client);
+    expect(calls[0].method).toBe("GET");
+    expect(calls[0].path).toBe("/v2.1/programs/{programId}/custom-fields");
+    expect(calls[0].pathParams).toEqual({ programId: "3f2b8c1e-5d4a-4e6b-9a7c-1b2d3e4f5a6b" });
   });
 });
 
@@ -111,6 +126,7 @@ describe("annotations: programsTools", () => {
       "intigriti_programs_list_submissions",
       "intigriti_programs_list_researchers",
       "intigriti_programs_list_payouts",
+      "intigriti_programs_get_custom_fields",
     ];
     for (const name of readOnlyNames) {
       const tool = programsTools.find((t) => t.name === name)!;

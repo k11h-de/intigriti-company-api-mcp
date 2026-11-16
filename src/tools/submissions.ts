@@ -16,6 +16,10 @@ import {
   SubmissionsGetPossibleGroupsInputSchema,
   SubmissionsListRetestsInputSchema,
   SubmissionsGetRetestInputSchema,
+  SubmissionsListAssigneesInputSchema,
+  SubmissionsSearchInputSchema,
+  SubmissionsAssignInputSchema,
+  SubmissionsSetCustomFieldValueInputSchema,
   SubmissionsAddCompanyBonusInputSchema,
   SubmissionsExportPdfInputSchema,
   SubmissionsExportCsvInputSchema,
@@ -42,6 +46,10 @@ import {
   type SubmissionsGetPossibleGroupsInput,
   type SubmissionsListRetestsInput,
   type SubmissionsGetRetestInput,
+  type SubmissionsListAssigneesInput,
+  type SubmissionsSearchInput,
+  type SubmissionsAssignInput,
+  type SubmissionsSetCustomFieldValueInput,
   type SubmissionsAddCompanyBonusInput,
   type SubmissionsExportPdfInput,
   type SubmissionsExportCsvInput,
@@ -191,6 +199,34 @@ const submissionsGetRetest: ToolDef<SubmissionsGetRetestInput> = {
         submissionCode: input.submissionCode,
         retestId: input.retestId,
       },
+    }),
+};
+
+const submissionsListAssignees: ToolDef<SubmissionsListAssigneesInput> = {
+  name: "intigriti_submissions_list_assignees",
+  description:
+    "List the eligible company users a submission can be assigned to (use their id with intigriti_submissions_assign). Only returns entries for Pending submissions; an empty list for any other state.",
+  inputSchema: SubmissionsListAssigneesInputSchema,
+  annotations: READ_ONLY_ANNOTATIONS,
+  handler: (input, client) =>
+    client.request({
+      method: "GET",
+      path: "/v2.1/submissions/{submissionCode}/assignees",
+      pathParams: { submissionCode: input.submissionCode },
+    }),
+};
+
+const submissionsSearch: ToolDef<SubmissionsSearchInput> = {
+  name: "intigriti_submissions_search",
+  description:
+    "[BETA] Search, filter, sort and page through submissions with the same query capabilities as the Intigriti platform (POST body, but read-only — nothing is changed). All parameters are optional. Filter operators: 1=Equal, 2=NotEqual, 3=GreaterThan, 4=GreaterThanOrEqual, 5=LessThan, 6=LessThanOrEqual, 7=Contains, 8=NotContains; logic: 1=Or, 2=And, 3=Any; sort direction: 1=Ascending, 2=Descending.",
+  inputSchema: SubmissionsSearchInputSchema,
+  annotations: READ_ONLY_ANNOTATIONS,
+  handler: (input, client) =>
+    client.request({
+      method: "POST",
+      path: "/v2.1/submissions/search",
+      body: input,
     }),
 };
 
@@ -522,6 +558,37 @@ const submissionsUpdateAsset: ToolDef<SubmissionsUpdateAssetInput> = {
   },
 };
 
+const submissionsAssign: ToolDef<SubmissionsAssignInput> = {
+  name: "intigriti_submissions_assign",
+  description:
+    "Assign an eligible company user to a submission (get candidates via intigriti_submissions_list_assignees). Only Pending submissions can be assigned. To assign yourself use intigriti_submissions_assign_to_me.",
+  inputSchema: SubmissionsAssignInputSchema,
+  annotations: MUTATION_IDEMPOTENT,
+  handler: (input, client) =>
+    client.request({
+      method: "PUT",
+      path: "/v2.1/submissions/{submissionCode}/assignee",
+      pathParams: { submissionCode: input.submissionCode },
+      body: { userId: input.userId },
+    }),
+};
+
+const submissionsSetCustomFieldValue: ToolDef<SubmissionsSetCustomFieldValueInput> =
+  {
+    name: "intigriti_submissions_set_custom_field_value",
+    description:
+      "Set the value of a custom field on a submission. The field id comes from intigriti_programs_get_custom_fields.",
+    inputSchema: SubmissionsSetCustomFieldValueInputSchema,
+    annotations: MUTATION_IDEMPOTENT,
+    handler: (input, client) =>
+      client.request({
+        method: "PUT",
+        path: "/v2.1/submissions/{submissionCode}/custom-field-value",
+        pathParams: { submissionCode: input.submissionCode },
+        body: { id: input.id, value: input.value ?? null },
+      }),
+  };
+
 // ---------------------------------------------------------------------------
 // Mutations — DELETEs
 // ---------------------------------------------------------------------------
@@ -572,6 +639,8 @@ export const submissionsTools: AnyToolDef[] = [
   submissionsGetPossibleGroups,
   submissionsListRetests,
   submissionsGetRetest,
+  submissionsListAssignees,
+  submissionsSearch,
   submissionsAddCompanyBonus,
   submissionsExportPdf,
   submissionsExportCsv,
@@ -588,6 +657,8 @@ export const submissionsTools: AnyToolDef[] = [
   submissionsUpdateAwaitingFeedback,
   submissionsUpdateGroup,
   submissionsUpdateAsset,
+  submissionsAssign,
+  submissionsSetCustomFieldValue,
   submissionsDeleteCompanyBonus,
   submissionsRemoveTag,
 ];

@@ -165,7 +165,7 @@ That's all — no env vars at runtime, because the server reads `~/.intigriti-mc
 
 After Claude Desktop restarts:
 
-1. **Check the MCP indicator.** In a new conversation, look for the tools/plug icon in the chat input area. It should show `intigriti` and list 52 tools. If the indicator shows an error or zero tools, the server failed to start — see Troubleshooting.
+1. **Check the MCP indicator.** In a new conversation, look for the tools/plug icon in the chat input area. It should show `intigriti` and list 57 tools. If the indicator shows an error or zero tools, the server failed to start — see Troubleshooting.
 
 2. **Run a read-only smoke test.** Ask:
 

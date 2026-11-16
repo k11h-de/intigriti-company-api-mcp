@@ -11,12 +11,14 @@ import {
   ProgramsListResearchersInputSchema,
   ProgramsListPayoutsInputSchema,
   ProgramsImportSubmissionInputSchema,
+  ProgramsGetCustomFieldsInputSchema,
   type ProgramsListInput,
   type ProgramsGetInput,
   type ProgramsListSubmissionsInput,
   type ProgramsListResearchersInput,
   type ProgramsListPayoutsInput,
   type ProgramsImportSubmissionInput,
+  type ProgramsGetCustomFieldsInput,
 } from "../schemas/programs.js";
 
 const programsList: ToolDef<ProgramsListInput> = {
@@ -37,6 +39,20 @@ const programsGet: ToolDef<ProgramsGetInput> = {
     client.request({
       method: "GET",
       path: "/v2.1/programs/{programId}",
+      pathParams: { programId: input.programId },
+    }),
+};
+
+const programsGetCustomFields: ToolDef<ProgramsGetCustomFieldsInput> = {
+  name: "intigriti_programs_get_custom_fields",
+  description:
+    "Get the custom fields defined on a program (ids needed for intigriti_submissions_set_custom_field_value).",
+  inputSchema: ProgramsGetCustomFieldsInputSchema,
+  annotations: READ_ONLY_ANNOTATIONS,
+  handler: (input, client) =>
+    client.request({
+      method: "GET",
+      path: "/v2.1/programs/{programId}/custom-fields",
       pathParams: { programId: input.programId },
     }),
 };
@@ -111,4 +127,5 @@ export const programsTools: AnyToolDef[] = [
   programsListResearchers,
   programsListPayouts,
   programsImportSubmission,
+  programsGetCustomFields,
 ];

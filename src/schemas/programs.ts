@@ -122,3 +122,10 @@ export const ProgramsImportSubmissionInputSchema = z.object({
 export type ProgramsImportSubmissionInput = z.infer<
   typeof ProgramsImportSubmissionInputSchema
 >;
+
+export const ProgramsGetCustomFieldsInputSchema = z.object({
+  programId: z.string().uuid().describe("GUID of the program"),
+}).strict();
+export type ProgramsGetCustomFieldsInput = z.infer<
+  typeof ProgramsGetCustomFieldsInputSchema
+>;

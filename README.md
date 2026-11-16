@@ -104,12 +104,12 @@ Add one of the following blocks to `claude_desktop_config.json`. See Claude Desk
 
 ## Tools
 
-52 tools across 9 tags. Tool names follow the convention `intigriti_<tag>_<action>`.
+57 tools across 9 tags. Tool names follow the convention `intigriti_<tag>_<action>`.
 
 | Tag | Count | Coverage |
 |-----|-------|----------|
-| Submissions | 26 | list, get, create, update state/severity/tags, retests (read-only: list, get), messages, attachments, exports (PDF, CSV) |
-| Programs | 6 | list, get, list submissions/researchers/payouts, import submission (BETA — creates a real submission) |
+| Submissions | 30 | list, search (BETA), get, update state/severity/tags, assignees (list, assign), custom field values, retests (read-only: list, get), messages, attachments, exports (PDF, CSV) |
+| Programs | 7 | list, get, custom fields, list submissions/researchers/payouts, import submission (BETA — creates a real submission) |
 | ProgramUpdates | 6 | list (all + per-program), create, update, delete, publish |
 | RewardSystem | 5 | reward request CRUD, payout creation, budget |
 | CompanyAssets | 3 | — |
